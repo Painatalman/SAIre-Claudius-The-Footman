@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "footman": {
+      "command": "node",
+      "args": ["/Users/dengun/Documents/Projects/mask-ot/mcp-server/index.js"]
+    }
+  }
+}

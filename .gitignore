@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build output
+dist/
+out/
+build/
+
+# Environment
+.env
+.env.local
+
+# Editor
+.vscode/
+.idea/
+
+# Claude Code local state
+.claude/

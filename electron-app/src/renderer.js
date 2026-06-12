@@ -1,0 +1,210 @@
+// State management
+let currentState = 'idle';
+const sounds = {
+  workComplete: new Audio('../../assets/sounds/work-completed.mp3'),
+  yesMyLord: new Audio('../../assets/sounds/yes-my-lord.mp3'),
+  atOnceSire: new Audio('../../assets/sounds/at-once-sire.mp3'),
+  awaitingOrders: new Audio('../../assets/sounds/awaiting-orders.mp3'),
+  myLord: new Audio('../../assets/sounds/my-lord.mp3'),
+  error: new Audio('../../assets/sounds/my-lord.mp3') // Use my-lord for error as placeholder
+};
+
+// Load authentic WC2 Footman portrait
+function loadFootmanPortrait() {
+  const portraitContainer = document.getElementById('footman-portrait');
+
+  const img = document.createElement('img');
+  img.src = '../../assets/sprites/footman.jpg';
+  img.alt = 'Footman';
+  img.id = 'footman-img';
+
+  img.onerror = () => {
+    console.error('Failed to load portrait:', img.src);
+    portraitContainer.innerHTML = '<div style="width:64px;height:64px;background:#666;border:2px solid #333;"></div>';
+  };
+
+  portraitContainer.innerHTML = '';
+  portraitContainer.appendChild(img);
+  changeExpression('neutral');
+}
+
+// Change facial expression
+function changeExpression(expression) {
+  const portrait = document.getElementById('footman-portrait');
+  const expressions = {
+    neutral: { eyebrows: 0, mouth: 0 },
+    satisfied: { eyebrows: 2, mouth: 2 },
+    concerned: { eyebrows: -2, mouth: -2 },
+    alert: { eyebrows: 3, mouth: 1 }
+  };
+
+  // This will be implemented when we have the actual SVG with animatable parts
+  portrait.setAttribute('data-expression', expression);
+}
+
+// Show speech balloon
+function showBalloon(text, duration = 5000) {
+  const balloon = document.getElementById('speech-balloon');
+  const balloonText = document.getElementById('balloon-text');
+
+  balloonText.textContent = text;
+  balloon.classList.remove('hidden');
+  balloon.classList.add('balloon-fade-in');
+
+  if (duration > 0) {
+    setTimeout(() => {
+      balloon.classList.add('hidden');
+    }, duration);
+  }
+}
+
+// Hide speech balloon
+function hideBalloon() {
+  const balloon = document.getElementById('speech-balloon');
+  balloon.classList.add('hidden');
+}
+
+// Change widget state
+function setState(state) {
+  const container = document.getElementById('widget-container');
+
+  // Remove all state classes
+  container.className = '';
+
+  // Add new state class
+  container.classList.add(`state-${state}`);
+  currentState = state;
+}
+
+// Play sound safely
+function playSound(soundName) {
+  if (sounds[soundName]) {
+    sounds[soundName].currentTime = 0;
+    sounds[soundName].play().catch(err => {
+      console.warn('Sound playback failed:', err);
+    });
+  }
+}
+
+// Notification handlers
+function notifyWorkComplete(message = 'Work complete!') {
+  setState('complete');
+  changeExpression('satisfied');
+  showBalloon(message, 5000);
+  playSound('workComplete');
+
+  setTimeout(() => {
+    setState('idle');
+    changeExpression('neutral');
+  }, 5000);
+}
+
+function notifyPrompt(question, options = []) {
+  setState('prompt');
+  changeExpression('alert');
+  showBalloon(question, 0); // Don't auto-hide
+  playSound('myLord');
+
+  // TODO: Add clickable options to balloon
+}
+
+function notifyError(message = 'Something went wrong') {
+  setState('error');
+  changeExpression('concerned');
+  showBalloon(message, 5000);
+  playSound('error');
+
+  setTimeout(() => {
+    setState('idle');
+    changeExpression('neutral');
+  }, 5000);
+}
+
+function notifyWorking(taskDescription = 'Working') {
+  setState('working');
+  changeExpression('neutral');
+  // Strip any trailing dots — the animated ellipsis replaces them
+  showBalloon(taskDescription.replace(/\.+\s*$/, ''), 0); // Keep showing until done
+  appendWorkingDots();
+  playSound('atOnceSire');
+}
+
+// Animated "..." appended to the balloon while working
+function appendWorkingDots() {
+  const balloonText = document.getElementById('balloon-text');
+  const dots = document.createElement('span');
+  dots.className = 'working-dots';
+  dots.innerHTML = '<span>.</span><span>.</span><span>.</span>';
+  balloonText.appendChild(dots);
+}
+
+// Mock notification system for testing
+function startMockNotifications() {
+  // Test sequence: idle -> working -> complete -> idle -> prompt
+  let step = 0;
+
+  setInterval(() => {
+    step++;
+    switch (step % 5) {
+      case 0:
+        setState('idle');
+        hideBalloon();
+        break;
+      case 1:
+        notifyWorking('Building project...');
+        break;
+      case 2:
+        notifyWorkComplete('Build successful!');
+        break;
+      case 3:
+        notifyPrompt('Continue with tests?', ['Yes', 'No']);
+        break;
+      case 4:
+        notifyError('Test failed');
+        break;
+    }
+  }, 4000);
+}
+
+// Listen for notifications from main process
+const { ipcRenderer } = require('electron');
+
+ipcRenderer.on('notification', (event, data) => {
+  const { type, message, options } = data;
+
+  switch (type) {
+    case 'task_complete':
+      notifyWorkComplete(message);
+      break;
+    case 'task_working':
+      notifyWorking(message);
+      break;
+    case 'prompt':
+      notifyPrompt(message, options);
+      break;
+    case 'error':
+      notifyError(message);
+      break;
+    default:
+      console.warn('Unknown notification type:', type);
+  }
+});
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+  loadFootmanPortrait();
+  setState('idle');
+
+  // Start mock notifications in development
+  if (process.argv && process.argv.includes('--dev')) {
+    setTimeout(() => startMockNotifications(), 2000);
+  }
+});
+
+// Export for HTTP server to use later
+window.FootmanWidget = {
+  notifyWorkComplete,
+  notifyPrompt,
+  notifyError,
+  notifyWorking
+};

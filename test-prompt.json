@@ -1,0 +1,5 @@
+{
+  "type": "prompt",
+  "message": "Continue with next phase?",
+  "options": ["Yes", "No", "Later"]
+}

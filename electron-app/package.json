@@ -1,0 +1,19 @@
+{
+  "name": "footman-widget",
+  "version": "0.1.0",
+  "description": "Warcraft 2 Footman notification widget for AI tasks",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "keywords": ["electron", "notification", "widget", "warcraft"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0"
+  }
+}

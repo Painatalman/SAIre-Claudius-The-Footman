@@ -1,0 +1,183 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: transparent;
+  overflow: hidden;
+  cursor: move;
+  -webkit-app-region: drag;
+  user-select: none;
+  font-family: 'Courier New', monospace;
+}
+
+#widget-container {
+  position: relative;
+  width: 280px;
+  height: 180px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+#footman-portrait {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  /* Allow dragging the portrait */
+  -webkit-app-region: drag;
+  pointer-events: auto;
+}
+
+#footman-portrait svg {
+  width: 100%;
+  height: 100%;
+}
+
+#footman-portrait img {
+  width: 100%;
+  height: 100%;
+  /* Crop the black side bars of the source image */
+  object-fit: cover;
+  border: 2px solid #3d2817;
+  border-radius: 4px;
+  display: block;
+}
+
+/* Speech Balloon */
+#speech-balloon {
+  position: relative;
+  background: #f5e6d3;
+  border: 2px solid #3d2817;
+  border-radius: 8px;
+  padding: 8px 12px;
+  max-width: 200px;
+  min-width: 120px;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  margin-top: 8px;
+  -webkit-app-region: no-drag;
+}
+
+#speech-balloon.hidden {
+  display: none;
+}
+
+.balloon-tail {
+  position: absolute;
+  left: -8px;
+  top: 12px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 8px solid #3d2817;
+}
+
+.balloon-tail::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: -6px;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 6px solid #f5e6d3;
+}
+
+.balloon-content {
+  color: #3d2817;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+#balloon-text {
+  word-wrap: break-word;
+}
+
+/* Animation States */
+.state-idle #footman-portrait {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+.state-working #footman-portrait {
+  animation: work 1s ease-in-out infinite;
+}
+
+.state-complete #footman-portrait {
+  animation: nod 0.5s ease-out;
+}
+
+.state-prompt #footman-portrait {
+  animation: alert 0.3s ease-in-out 3;
+}
+
+.state-error #footman-portrait {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes work {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes nod {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(4px); }
+  75% { transform: translateY(2px); }
+}
+
+@keyframes alert {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+/* Animated working ellipsis */
+.working-dots span {
+  opacity: 0;
+  animation: dotPulse 1.5s ease-in-out infinite;
+}
+
+.working-dots span:nth-child(2) {
+  animation-delay: 0.25s;
+}
+
+.working-dots span:nth-child(3) {
+  animation-delay: 0.5s;
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 0; }
+  30%, 70% { opacity: 1; }
+}
+
+/* Fade-in animation for balloon */
+.balloon-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

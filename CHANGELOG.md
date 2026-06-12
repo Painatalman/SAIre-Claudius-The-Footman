@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SessionStart hook script (`scripts/launch-footman.sh`) that auto-launches the widget if it isn't running and registers each new Claude Code session with the session counter
 - PermissionRequest hook documented in the README — the Footman now announces "Permission needed: `<tool name>`" whenever a session shows a permission dialog
 - Full setup and reference guide in the README — MCP server registration, all five Claude Code hooks explained, manual run instructions, widget behavior, HTTP API, wired sounds, and troubleshooting
+- Permission notifications now show the actual request — the Bash command, file path, URL, or prompt (truncated to 160 characters) on a second line — instead of just the tool name; the speech balloon renders the extra line properly
 
 ### Fixed
 

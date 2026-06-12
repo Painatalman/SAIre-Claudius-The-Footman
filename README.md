@@ -124,7 +124,7 @@ The MCP tools only fire when Claude chooses to call them. For deterministic noti
             "type": "command",
             "async": true,
             "timeout": 5,
-            "command": "jq -c '{type:\"prompt\",message:(\"Permission needed: \" + (.tool_name // \"a tool\")),sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+            "command": "jq -c '{type:\"prompt\",message:((\"Permission needed: \" + (.tool_name // \"a tool\")) + (((.tool_input.command // .tool_input.file_path // .tool_input.url // .tool_input.prompt // \"\") | tostring) as $d | if ($d | length) > 0 then \"\\n\" + $d[0:160] else \"\" end)),sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -152,7 +152,7 @@ What each hook does:
 - **UserPromptSubmit** → working state ("At once, sire!", animated ellipsis)
 - **Stop** → completion ("Work complete!")
 - **Notification** → prompt state with the notification text ("My lord?") — fires on idle nudges
-- **PermissionRequest** → prompt state naming the tool that needs approval ("My lord?")
+- **PermissionRequest** → prompt state with the tool name and the actual request — the Bash command, file path, or URL — truncated to 160 chars ("My lord?")
 - **SessionEnd** → removes the session from the counter
 
 All hooks are async with short timeouts and failure suppression — if the widget isn't running, Claude Code is unaffected.

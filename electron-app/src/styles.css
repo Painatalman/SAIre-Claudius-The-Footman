@@ -121,6 +121,8 @@ body {
 
 #balloon-text {
   word-wrap: break-word;
+  /* Render newlines — permission messages put the detail on a second line */
+  white-space: pre-line;
 }
 
 /* Clickable answer options inside the balloon */

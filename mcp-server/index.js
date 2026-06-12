@@ -8,7 +8,7 @@ import {
 
 import { randomUUID } from 'node:crypto';
 
-const FOOTMAN_BASE = 'http://localhost:3000';
+const FOOTMAN_BASE = 'http://localhost:6112';
 const FOOTMAN_URL = `${FOOTMAN_BASE}/notify`;
 
 // Send notification to Footman widget

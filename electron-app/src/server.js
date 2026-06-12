@@ -1,6 +1,8 @@
 const express = require('express');
 const app = express();
-const PORT = 3000;
+// 6112 — the classic Battle.net game port. Dev servers swarm 3000;
+// the original port got shadowed by a Vite server on [::1]:3000.
+const PORT = 6112;
 
 app.use(express.json());
 

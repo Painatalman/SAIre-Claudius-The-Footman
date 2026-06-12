@@ -5,8 +5,8 @@
 
 INPUT=$(cat)
 
-HEALTH_URL="http://localhost:3000/health"
-NOTIFY_URL="http://localhost:3000/notify"
+HEALTH_URL="http://localhost:6112/health"
+NOTIFY_URL="http://localhost:6112/notify"
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../electron-app" && pwd)"
 
 if ! curl -s --max-time 1 "$HEALTH_URL" >/dev/null 2>&1; then

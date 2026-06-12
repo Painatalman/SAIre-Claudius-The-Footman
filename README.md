@@ -85,7 +85,7 @@ The MCP tools only fire when Claude chooses to call them. For deterministic noti
             "type": "command",
             "async": true,
             "timeout": 5,
-            "command": "jq -c '{type:\"task_working\",message:\"Working\",sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:3000/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+            "command": "jq -c '{type:\"task_working\",message:\"Working\",sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -98,7 +98,7 @@ The MCP tools only fire when Claude chooses to call them. For deterministic noti
             "type": "command",
             "async": true,
             "timeout": 5,
-            "command": "jq -c '{type:\"task_complete\",message:\"Work complete!\",sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:3000/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+            "command": "jq -c '{type:\"task_complete\",message:\"Work complete!\",sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -111,7 +111,20 @@ The MCP tools only fire when Claude chooses to call them. For deterministic noti
             "type": "command",
             "async": true,
             "timeout": 5,
-            "command": "jq -c '{type:\"prompt\",message:(.message // \"My lord?\"),sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:3000/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+            "command": "jq -c '{type:\"prompt\",message:(.message // \"My lord?\"),sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "async": true,
+            "timeout": 5,
+            "command": "jq -c '{type:\"prompt\",message:(\"Permission needed: \" + (.tool_name // \"a tool\")),sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -124,7 +137,7 @@ The MCP tools only fire when Claude chooses to call them. For deterministic noti
             "type": "command",
             "async": true,
             "timeout": 5,
-            "command": "jq -c '{type:\"session_end\",sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:3000/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+            "command": "jq -c '{type:\"session_end\",sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -138,7 +151,8 @@ What each hook does:
 - **SessionStart** → runs `launch-footman.sh`: starts the widget if it isn't running, then registers the session with the counter
 - **UserPromptSubmit** → working state ("At once, sire!", animated ellipsis)
 - **Stop** → completion ("Work complete!")
-- **Notification** → prompt state with the actual notification text ("My lord?")
+- **Notification** → prompt state with the notification text ("My lord?") — fires on idle nudges
+- **PermissionRequest** → prompt state naming the tool that needs approval ("My lord?")
 - **SessionEnd** → removes the session from the counter
 
 All hooks are async with short timeouts and failure suppression — if the widget isn't running, Claude Code is unaffected.
@@ -175,7 +189,7 @@ npm run dev
 
 ## HTTP API
 
-The widget listens on `http://localhost:3000`:
+The widget listens on `http://localhost:6112`:
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -199,7 +213,7 @@ The widget listens on `http://localhost:3000`:
 Example:
 
 ```bash
-curl -X POST http://localhost:3000/notify \
+curl -X POST http://localhost:6112/notify \
   -H 'Content-Type: application/json' \
   -d '{"type":"task_complete","message":"Work complete!"}'
 ```
@@ -218,6 +232,6 @@ Six more voice lines are present and available for future states.
 ## Troubleshooting
 
 - **No sound** — Electron blocks autoplay without a user gesture by default; the app sets `autoplay-policy: no-user-gesture-required`, so if sounds are missing, check the paths resolve (`assets/` is at the repo root, two levels above `electron-app/src/`).
-- **Widget didn't auto-launch** — run `bash scripts/launch-footman.sh < /dev/null` manually and check `curl http://localhost:3000/health`.
+- **Widget didn't auto-launch** — run `bash scripts/launch-footman.sh < /dev/null` manually and check `curl http://localhost:6112/health`.
 - **Hooks not firing** — open `/hooks` in Claude Code to verify they loaded; a malformed `settings.json` silently disables all hooks.
 - **Counter shows nothing** — it only learns about sessions from hook events; sessions appear as they next do something.

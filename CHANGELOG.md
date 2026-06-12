@@ -20,3 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Container padding so the idle aura glow renders without clipping
+
+### Changed
+
+- Removed the dark border from the portrait so the idle aura blends straight off the portrait edges
+- Removed the speech balloon drop shadow, which read as a black border under the balloon
+- Lightened the balloon border and tail from near-black to warm parchment-brown

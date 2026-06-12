@@ -45,7 +45,6 @@ body {
   height: 100%;
   /* Crop the black side bars of the source image */
   object-fit: cover;
-  border: 2px solid #3d2817;
   border-radius: 4px;
   display: block;
 }
@@ -54,12 +53,11 @@ body {
 #speech-balloon {
   position: relative;
   background: #f5e6d3;
-  border: 2px solid #3d2817;
+  border: 2px solid #8b6f47;
   border-radius: 8px;
   padding: 8px 12px;
   max-width: 200px;
   min-width: 120px;
-  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
   margin-top: 8px;
   -webkit-app-region: no-drag;
 }
@@ -76,7 +74,7 @@ body {
   height: 0;
   border-top: 8px solid transparent;
   border-bottom: 8px solid transparent;
-  border-right: 8px solid #3d2817;
+  border-right: 8px solid #8b6f47;
 }
 
 .balloon-tail::after {

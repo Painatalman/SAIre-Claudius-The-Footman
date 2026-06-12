@@ -6,15 +6,18 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-const FOOTMAN_URL = 'http://localhost:3000/notify';
+import { randomUUID } from 'node:crypto';
+
+const FOOTMAN_BASE = 'http://localhost:3000';
+const FOOTMAN_URL = `${FOOTMAN_BASE}/notify`;
 
 // Send notification to Footman widget
-async function notifyFootman(type, message, options = null) {
+async function notifyFootman(type, message, options = null, promptId = null) {
   try {
     const response = await fetch(FOOTMAN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, message, options })
+      body: JSON.stringify({ type, message, options, promptId })
     });
 
     if (!response.ok) {
@@ -27,6 +30,26 @@ async function notifyFootman(type, message, options = null) {
     console.error('Failed to notify Footman:', error.message);
     return false;
   }
+}
+
+// Poll the widget for the user's answer to a prompt
+async function waitForResponse(promptId, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${FOOTMAN_BASE}/response/${promptId}`);
+      if (res.ok) {
+        const { choice } = await res.json();
+        return choice;
+      }
+    } catch {
+      // Widget restarting or unreachable — keep polling until deadline
+    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  return null;
 }
 
 // Create MCP server
@@ -149,16 +172,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         ],
       };
 
-    case 'footman_prompt':
-      await notifyFootman('prompt', args.question, args.options);
+    case 'footman_prompt': {
+      const promptId = randomUUID();
+      const sent = await notifyFootman('prompt', args.question, args.options, promptId);
+
+      if (!sent) {
+        return {
+          content: [
+            { type: 'text', text: 'Footman widget is not running — prompt could not be shown.' },
+          ],
+        };
+      }
+
+      // Poll for the user's click, up to 5 minutes
+      const choice = await waitForResponse(promptId, 5 * 60 * 1000);
+
+      if (choice === null) {
+        return {
+          content: [
+            { type: 'text', text: `No response from user (timed out after 5 minutes): ${args.question}` },
+          ],
+        };
+      }
+
       return {
         content: [
-          {
-            type: 'text',
-            text: `Footman prompt: ${args.question}`,
-          },
+          { type: 'text', text: `User selected: ${choice}` },
         ],
       };
+    }
 
     default:
       throw new Error(`Unknown tool: ${name}`);

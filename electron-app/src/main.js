@@ -68,6 +68,11 @@ function createWindow() {
   }
 }
 
+// Relay prompt answers from the renderer to the HTTP response store
+ipcMain.on('prompt-response', (event, { id, choice }) => {
+  server.storeResponse(id, choice);
+});
+
 app.whenReady().then(() => {
   createWindow();
   server.start();

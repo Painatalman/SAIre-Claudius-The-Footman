@@ -6,38 +6,57 @@ app.use(express.json());
 
 let mainWindow = null;
 
+// User answers to interactive prompts, keyed by prompt ID
+const responses = new Map();
+
 // Initialize with Electron window
 function setWindow(window) {
   mainWindow = window;
 }
 
+// Store a user's answer (called from main process on renderer click)
+function storeResponse(id, choice) {
+  responses.set(id, choice);
+}
+
 // Notification endpoint
 app.post('/notify', (req, res) => {
-  const { type, message, options, sessionId } = req.body;
+  const { type, message, options, sessionId, promptId } = req.body;
 
   if (!mainWindow || mainWindow.isDestroyed()) {
     return res.status(500).json({ error: 'Widget not ready' });
   }
 
-  console.log('Received notification:', { type, message, sessionId });
+  console.log('Received notification:', { type, message, sessionId, promptId });
 
   // Send to renderer process
-  mainWindow.webContents.send('notification', { type, message, options, sessionId });
+  mainWindow.webContents.send('notification', { type, message, options, sessionId, promptId });
 
   res.json({ success: true });
 });
 
-// Callback endpoint for user responses
+// Store a response directly (manual testing)
 app.post('/response/:id', (req, res) => {
   const { id } = req.params;
   const { choice } = req.body;
 
   console.log('Received response:', { id, choice });
-
-  // Store response for MCP to poll
-  // TODO: Implement callback mechanism
+  storeResponse(id, choice);
 
   res.json({ success: true });
+});
+
+// Poll endpoint for the MCP server to collect the user's answer
+app.get('/response/:id', (req, res) => {
+  const { id } = req.params;
+
+  if (responses.has(id)) {
+    const choice = responses.get(id);
+    responses.delete(id);
+    return res.json({ choice });
+  }
+
+  res.status(404).json({ pending: true });
 });
 
 // Health check
@@ -51,4 +70,4 @@ function start() {
   });
 }
 
-module.exports = { start, setWindow };
+module.exports = { start, setWindow, storeResponse };

@@ -122,6 +122,34 @@ body {
   word-wrap: break-word;
 }
 
+/* Clickable answer options inside the balloon */
+#balloon-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#balloon-options:not(:empty) {
+  margin-top: 6px;
+}
+
+.balloon-option {
+  font-family: inherit;
+  font-size: 11px;
+  text-align: left;
+  padding: 3px 8px;
+  background: #e8d4b8;
+  color: #3d2817;
+  border: 1px solid #8b6f47;
+  border-radius: 4px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.balloon-option:hover {
+  background: #ffd700;
+}
+
 /* Animation States */
 .state-idle #footman-portrait {
   animation: breathe 3s ease-in-out infinite;

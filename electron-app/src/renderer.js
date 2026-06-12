@@ -6,6 +6,7 @@ const sounds = {
   atOnceSire: new Audio('../../assets/sounds/at-once-sire.mp3'),
   awaitingOrders: new Audio('../../assets/sounds/awaiting-orders.mp3'),
   myLord: new Audio('../../assets/sounds/my-lord.mp3'),
+  asYouWish: new Audio('../../assets/sounds/as-you-wish.mp3'),
   error: new Audio('../../assets/sounds/my-lord.mp3') // Use my-lord for error as placeholder
 };
 
@@ -46,6 +47,9 @@ function changeExpression(expression) {
 function showBalloon(text, duration = 5000) {
   const balloon = document.getElementById('speech-balloon');
   const balloonText = document.getElementById('balloon-text');
+
+  // Clear any leftover answer buttons from a previous prompt
+  document.getElementById('balloon-options').innerHTML = '';
 
   balloonText.textContent = text;
   balloon.classList.remove('hidden');
@@ -99,13 +103,29 @@ function notifyWorkComplete(message = 'Work complete!') {
   }, 5000);
 }
 
-function notifyPrompt(question, options = []) {
+function notifyPrompt(question, options = [], promptId = null) {
   setState('prompt');
   changeExpression('alert');
   showBalloon(question, 0); // Don't auto-hide
   playSound('myLord');
 
-  // TODO: Add clickable options to balloon
+  // Render clickable answer options when the prompt expects a response
+  if (promptId && Array.isArray(options) && options.length > 0) {
+    const container = document.getElementById('balloon-options');
+    options.forEach(option => {
+      const btn = document.createElement('button');
+      btn.className = 'balloon-option';
+      btn.textContent = option;
+      btn.addEventListener('click', () => {
+        ipcRenderer.send('prompt-response', { id: promptId, choice: option });
+        showBalloon('As you wish!', 3000);
+        playSound('asYouWish');
+        setState('idle');
+        changeExpression('neutral');
+      });
+      container.appendChild(btn);
+    });
+  }
 }
 
 function notifyError(message = 'Something went wrong') {
@@ -212,7 +232,7 @@ setInterval(() => {
 const { ipcRenderer } = require('electron');
 
 ipcRenderer.on('notification', (event, data) => {
-  const { type, message, options, sessionId } = data;
+  const { type, message, options, sessionId, promptId } = data;
 
   switch (type) {
     case 'task_complete':
@@ -225,7 +245,7 @@ ipcRenderer.on('notification', (event, data) => {
       break;
     case 'prompt':
       touchSession(sessionId, 'awaiting');
-      notifyPrompt(message, options);
+      notifyPrompt(message, options, promptId);
       break;
     case 'error':
       touchSession(sessionId, 'idle');

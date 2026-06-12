@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Occasional idle fidget — the Footman wiggles every 25 seconds between tasks so he feels alive
 - Live session counter under the portrait showing how many Claude Code sessions are at work vs awaiting orders, hidden when no sessions are known; sessions silent for over 6 hours are forgotten automatically
 - Interactive prompts — the Footman now shows clickable answer buttons in his speech balloon, replies "As you wish!" when you pick one, and delivers your choice back to Claude (waiting up to 5 minutes for an answer)
+- SessionStart hook script (`scripts/launch-footman.sh`) that auto-launches the widget if it isn't running and registers each new Claude Code session with the session counter
 
 ### Fixed
 

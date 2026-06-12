@@ -166,24 +166,77 @@ function startMockNotifications() {
   }, 4000);
 }
 
+// Per-session state tracking for the session counter
+const sessions = new Map();
+
+function touchSession(sessionId, state) {
+  if (!sessionId) return;
+  sessions.set(sessionId, { state, lastSeen: Date.now() });
+  updateSessionStatus();
+}
+
+function endSession(sessionId) {
+  if (!sessionId) return;
+  sessions.delete(sessionId);
+  updateSessionStatus();
+}
+
+function updateSessionStatus() {
+  const bar = document.getElementById('session-status');
+  const states = [...sessions.values()].map(s => s.state);
+  if (states.length === 0) {
+    bar.classList.add('hidden');
+    return;
+  }
+  const working = states.filter(s => s === 'working').length;
+  const awaiting = states.length - working;
+  bar.textContent = `⚔ ${working} · 💤 ${awaiting}`;
+  bar.title = `${states.length} session(s) open — ${working} at work, ${awaiting} awaiting orders`;
+  bar.classList.remove('hidden');
+}
+
+// Prune sessions silent for 6+ hours (closed without a session_end event)
+setInterval(() => {
+  const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+  let changed = false;
+  for (const [id, s] of sessions) {
+    if (s.lastSeen < cutoff) {
+      sessions.delete(id);
+      changed = true;
+    }
+  }
+  if (changed) updateSessionStatus();
+}, 60 * 1000);
+
 // Listen for notifications from main process
 const { ipcRenderer } = require('electron');
 
 ipcRenderer.on('notification', (event, data) => {
-  const { type, message, options } = data;
+  const { type, message, options, sessionId } = data;
 
   switch (type) {
     case 'task_complete':
+      touchSession(sessionId, 'idle');
       notifyWorkComplete(message);
       break;
     case 'task_working':
+      touchSession(sessionId, 'working');
       notifyWorking(message);
       break;
     case 'prompt':
+      touchSession(sessionId, 'awaiting');
       notifyPrompt(message, options);
       break;
     case 'error':
+      touchSession(sessionId, 'idle');
       notifyError(message);
+      break;
+    case 'session_start':
+      // Bookkeeping only — no balloon or sound
+      touchSession(sessionId, 'idle');
+      break;
+    case 'session_end':
+      endSession(sessionId);
       break;
     default:
       console.warn('Unknown notification type:', type);

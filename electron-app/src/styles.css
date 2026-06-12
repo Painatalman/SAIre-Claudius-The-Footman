@@ -24,6 +24,14 @@ body {
   padding: 10px;
 }
 
+#left-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 #footman-portrait {
   width: 64px;
   height: 64px;
@@ -33,6 +41,21 @@ body {
   /* Allow dragging the portrait */
   -webkit-app-region: drag;
   pointer-events: auto;
+}
+
+/* Session counter, WC2 supply-counter style */
+#session-status {
+  font-size: 10px;
+  color: #ffd700;
+  background: rgba(20, 12, 5, 0.85);
+  border: 1px solid #8b6f47;
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+#session-status.hidden {
+  display: none;
 }
 
 #footman-portrait svg {

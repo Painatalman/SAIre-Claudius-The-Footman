@@ -13,16 +13,16 @@ function setWindow(window) {
 
 // Notification endpoint
 app.post('/notify', (req, res) => {
-  const { type, message, options } = req.body;
+  const { type, message, options, sessionId } = req.body;
 
   if (!mainWindow || mainWindow.isDestroyed()) {
     return res.status(500).json({ error: 'Widget not ready' });
   }
 
-  console.log('Received notification:', { type, message });
+  console.log('Received notification:', { type, message, sessionId });
 
   // Send to renderer process
-  mainWindow.webContents.send('notification', { type, message, options });
+  mainWindow.webContents.send('notification', { type, message, options, sessionId });
 
   res.json({ success: true });
 });

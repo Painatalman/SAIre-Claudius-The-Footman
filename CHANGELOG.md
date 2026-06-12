@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Clicks on the transparent parts of the widget window now pass through to the apps behind it instead of being swallowed by the invisible 280×180 window rectangle — the portrait, session counter, and speech balloon (with its answer buttons) remain fully clickable and draggable
 - Intermittent dark halo ("black aura") around the widget on macOS — the native window shadow is now disabled for the transparent window
 - Container padding so the idle aura glow renders without clipping
 - Widget layout is now anchored to the bottom so the speech balloon grows upward — long prompts no longer run off-screen when the widget sits in the bottom corner

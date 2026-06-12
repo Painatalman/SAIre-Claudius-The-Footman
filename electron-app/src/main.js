@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const server = require('./server');
@@ -52,6 +52,10 @@ function createWindow() {
 
   mainWindow.loadFile('src/index.html');
 
+  // Start click-through; the renderer re-enables clicks when the cursor
+  // is over the portrait, counter, or balloon (forward keeps mousemove alive)
+  mainWindow.setIgnoreMouseEvents(true, { forward: true });
+
   // Set window for server
   server.setWindow(mainWindow);
 
@@ -76,9 +80,50 @@ ipcMain.on('prompt-response', (event, { id, choice }) => {
   server.storeResponse(id, choice);
 });
 
+// The renderer reports balloon visibility so click-through polling
+// knows when the balloon area is real content
+let balloonVisible = false;
+ipcMain.on('balloon-visible', (event, visible) => {
+  balloonVisible = visible;
+});
+
+// Click-through management. DOM mousemove can't drive this because
+// -webkit-app-region: drag swallows mouse events, so poll the screen
+// cursor from the main process instead and toggle setIgnoreMouseEvents.
+function startClickThroughPolling() {
+  // Content rect when only the portrait + counter are visible
+  // (bottom-left column: 10px padding, 64px portrait, counter below)
+  const COLUMN = { left: 6, right: 92, top: 72 };
+  let lastIgnore = null;
+
+  setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    const pt = screen.getCursorScreenPoint();
+    const b = mainWindow.getBounds();
+    const x = pt.x - b.x;
+    const y = pt.y - b.y;
+    const inWindow = x >= 0 && x <= b.width && y >= 0 && y <= b.height;
+
+    let overContent = false;
+    if (inWindow) {
+      overContent = balloonVisible
+        ? true // balloon can occupy most of the window — treat it all as content
+        : (x >= COLUMN.left && x <= COLUMN.right && y >= COLUMN.top);
+    }
+
+    const ignore = !overContent;
+    if (ignore !== lastIgnore) {
+      lastIgnore = ignore;
+      mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
+    }
+  }, 100);
+}
+
 app.whenReady().then(() => {
   createWindow();
   server.start();
+  startClickThroughPolling();
 });
 
 app.on('window-all-closed', () => {

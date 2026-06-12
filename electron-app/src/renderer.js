@@ -54,10 +54,12 @@ function showBalloon(text, duration = 5000) {
   balloonText.textContent = text;
   balloon.classList.remove('hidden');
   balloon.classList.add('balloon-fade-in');
+  ipcRenderer.send('balloon-visible', true);
 
   if (duration > 0) {
     setTimeout(() => {
       balloon.classList.add('hidden');
+      ipcRenderer.send('balloon-visible', false);
     }, duration);
   }
 }
@@ -66,6 +68,7 @@ function showBalloon(text, duration = 5000) {
 function hideBalloon() {
   const balloon = document.getElementById('speech-balloon');
   balloon.classList.add('hidden');
+  ipcRenderer.send('balloon-visible', false);
 }
 
 // Change widget state

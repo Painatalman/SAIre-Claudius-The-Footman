@@ -20,6 +20,8 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  /* Room for the idle aura glow to render without clipping */
+  padding: 10px;
 }
 
 #footman-portrait {
@@ -104,6 +106,16 @@ body {
   animation: breathe 3s ease-in-out infinite;
 }
 
+/* Golden aura pulse while idle, WC2 selected-unit style */
+.state-idle #footman-portrait img {
+  animation: aura 3s ease-in-out infinite;
+}
+
+@keyframes aura {
+  0%, 100% { box-shadow: 0 0 5px 1px rgba(255, 200, 60, 0.3); }
+  50% { box-shadow: 0 0 14px 4px rgba(255, 200, 60, 0.75); }
+}
+
 .state-working #footman-portrait {
   animation: work 1s ease-in-out infinite;
 }
@@ -145,6 +157,19 @@ body {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-4px); }
   75% { transform: translateX(4px); }
+}
+
+/* Occasional idle fidget — must come after the state rules so it wins */
+#footman-portrait.fidget {
+  animation: fidget 0.6s ease-in-out;
+}
+
+@keyframes fidget {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-3deg); }
+  40% { transform: rotate(3deg); }
+  60% { transform: rotate(-2deg); }
+  80% { transform: rotate(2deg); }
 }
 
 /* Animated working ellipsis */

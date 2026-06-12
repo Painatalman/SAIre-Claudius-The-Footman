@@ -190,10 +190,21 @@ ipcRenderer.on('notification', (event, data) => {
   }
 });
 
+// Occasional fidget while idle, so he feels alive between tasks
+function startIdleFidget() {
+  setInterval(() => {
+    if (currentState !== 'idle') return;
+    const portrait = document.getElementById('footman-portrait');
+    portrait.classList.add('fidget');
+    setTimeout(() => portrait.classList.remove('fidget'), 600);
+  }, 25000);
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   loadFootmanPortrait();
   setState('idle');
+  startIdleFidget();
 
   // Start mock notifications in development
   if (process.argv && process.argv.includes('--dev')) {

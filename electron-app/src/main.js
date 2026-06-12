@@ -38,6 +38,9 @@ function createWindow() {
     y: position.y,
     frame: false,
     transparent: true,
+    // macOS draws an intermittent dark halo around transparent windows
+    // unless the native window shadow is disabled
+    hasShadow: false,
     alwaysOnTop: true,
     resizable: false,
     skipTaskbar: true,

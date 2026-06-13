@@ -11,6 +11,18 @@ let mainWindow = null;
 // User answers to interactive prompts, keyed by prompt ID
 const responses = new Map();
 
+// Liveness heartbeats for interactive prompts, keyed by prompt ID. A prompt is
+// "alive" while something is still polling for its answer (the PermissionRequest
+// hook or the MCP server). Once that poller exits — because the request was
+// answered here, answered in Claude Code's own UI, or timed out — the heartbeat
+// goes stale and the widget can dismiss the prompt.
+const promptSeen = new Map();
+const PROMPT_ACTIVE_WINDOW_MS = 2500;
+
+function markPromptAlive(id) {
+  if (id) promptSeen.set(id, Date.now());
+}
+
 // Initialize with Electron window
 function setWindow(window) {
   mainWindow = window;
@@ -31,6 +43,9 @@ app.post('/notify', (req, res) => {
 
   console.log('Received notification:', { type, message, sessionId, promptId });
 
+  // A new interactive prompt starts out alive.
+  if (type === 'prompt' && promptId) markPromptAlive(promptId);
+
   // Send to renderer process
   mainWindow.webContents.send('notification', { type, message, options, sessionId, promptId });
 
@@ -48,9 +63,11 @@ app.post('/response/:id', (req, res) => {
   res.json({ success: true });
 });
 
-// Poll endpoint for the MCP server to collect the user's answer
+// Poll endpoint for the hook / MCP server to collect the user's answer. Every
+// poll doubles as a liveness heartbeat for that prompt.
 app.get('/response/:id', (req, res) => {
   const { id } = req.params;
+  markPromptAlive(id);
 
   if (responses.has(id)) {
     const choice = responses.get(id);
@@ -59,6 +76,18 @@ app.get('/response/:id', (req, res) => {
   }
 
   res.status(404).json({ pending: true });
+});
+
+// Which prompts still have a poller behind them. The widget uses this to dismiss
+// prompts that were answered elsewhere (or timed out).
+app.get('/prompts/active', (req, res) => {
+  const now = Date.now();
+  const active = [];
+  for (const [id, lastSeen] of promptSeen) {
+    if (now - lastSeen < PROMPT_ACTIVE_WINDOW_MS) active.push(id);
+    else promptSeen.delete(id);
+  }
+  res.json({ active });
 });
 
 // Health check

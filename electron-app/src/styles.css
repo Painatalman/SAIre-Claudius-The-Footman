@@ -136,14 +136,40 @@ body {
   white-space: pre-line;
 }
 
-/* Clickable answer options inside the balloon */
-#balloon-options {
+/* Stacked messages: each notification is its own line, newest at the bottom */
+.balloon-msg + .balloon-msg {
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(139, 111, 71, 0.3);
+}
+
+.balloon-msg-prompt {
+  font-weight: bold;
+}
+
+.balloon-msg-complete {
+  color: #2e5d2e;
+}
+
+.balloon-msg-error {
+  color: #7a2a1a;
+}
+
+.balloon-msg-ack {
+  font-style: italic;
+  color: #6b5535;
+}
+
+/* Finished work that is fading out of the stack */
+.balloon-msg-settled {
+  opacity: 0.55;
+}
+
+/* Clickable answer options inside a prompt message */
+.balloon-options {
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-#balloon-options:not(:empty) {
   margin-top: 6px;
 }
 

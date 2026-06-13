@@ -9,6 +9,10 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 let mainWindow;
 const POSITION_FILE = path.join(app.getPath('userData'), 'position.json');
 
+// Resting window height. The window grows taller to fit the balloon and
+// returns to this height when the balloon is hidden.
+const DEFAULT_WINDOW_HEIGHT = 180;
+
 function loadPosition() {
   try {
     if (fs.existsSync(POSITION_FILE)) {
@@ -23,8 +27,11 @@ function loadPosition() {
 
 function savePosition() {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    const position = mainWindow.getPosition();
-    fs.writeFileSync(POSITION_FILE, JSON.stringify({ x: position[0], y: position[1] }));
+    // Anchor by the bottom edge: if the window is currently grown to fit a
+    // balloon, store the resting top-left so the position doesn't drift.
+    const b = mainWindow.getBounds();
+    const restingY = (b.y + b.height) - DEFAULT_WINDOW_HEIGHT;
+    fs.writeFileSync(POSITION_FILE, JSON.stringify({ x: b.x, y: restingY }));
   }
 }
 
@@ -33,7 +40,7 @@ function createWindow() {
 
   mainWindow = new BrowserWindow({
     width: 280,
-    height: 180,
+    height: DEFAULT_WINDOW_HEIGHT,
     x: position.x,
     y: position.y,
     frame: false,
@@ -42,7 +49,9 @@ function createWindow() {
     // unless the native window shadow is disabled
     hasShadow: false,
     alwaysOnTop: true,
-    resizable: false,
+    // Resizable so the main process can grow the window to fit the balloon.
+    // The window is frameless and click-through, so the user can't drag-resize it.
+    resizable: true,
     skipTaskbar: true,
     webPreferences: {
       nodeIntegration: true,
@@ -78,6 +87,23 @@ function createWindow() {
 // Relay prompt answers from the renderer to the HTTP response store
 ipcMain.on('prompt-response', (event, { id, choice }) => {
   server.storeResponse(id, choice);
+});
+
+// Resize the window to fit the balloon, keeping the bottom edge fixed so the
+// balloon grows upward. Clamped to the display work area so it never runs off
+// the top of the screen (beyond that the balloon scrolls internally).
+ipcMain.on('resize-window', (event, { height }) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  const bounds = mainWindow.getBounds();
+  const bottom = bounds.y + bounds.height;
+  const workArea = screen.getDisplayMatching(bounds).workArea;
+
+  const newHeight = Math.min(Math.max(Math.round(height), DEFAULT_WINDOW_HEIGHT), workArea.height);
+  const newY = Math.max(workArea.y, bottom - newHeight);
+
+  if (newHeight === bounds.height && newY === bounds.y) return;
+  mainWindow.setBounds({ x: bounds.x, y: newY, width: bounds.width, height: newHeight });
 });
 
 // The renderer reports balloon visibility so click-through polling

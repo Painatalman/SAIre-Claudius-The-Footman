@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full setup and reference guide in the README — MCP server registration, all five Claude Code hooks explained, manual run instructions, widget behavior, HTTP API, wired sounds, and troubleshooting
 - Permission notifications now show the actual request — the Bash command, file path, URL, or prompt (truncated to 160 characters) on a second line — instead of just the tool name; the speech balloon renders the extra line properly
 - Interactive permission prompts — the PermissionRequest hook (`scripts/permission-prompt.mjs`) now shows **Allow**/**Deny** buttons in the balloon and actually approves or blocks the tool call based on your click. The hook is synchronous so it can return the decision to Claude Code; if the widget isn't running or you don't answer within ~55 seconds, it falls back to Claude Code's normal permission dialog
+- Permission prompts display the request literally — the tool name and the exact command, file path, or URL (or the full `tool_input` as JSON for other tools), with no rewording and no truncation
 
 ### Fixed
 
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Intermittent dark halo ("black aura") around the widget on macOS — the native window shadow is now disabled for the transparent window
 - Container padding so the idle aura glow renders without clipping
 - Widget layout is now anchored to the bottom so the speech balloon grows upward — long prompts no longer run off-screen when the widget sits in the bottom corner
+- Long balloon messages are no longer clipped by the fixed 280×180 window — the window now grows taller to fit the balloon (anchored at the bottom so it expands upward) and shrinks back when the balloon hides; messages taller than the screen scroll inside the balloon instead of being cut off
 - Notifications silently vanishing when another project's Vite dev server bound `[::1]:3000` — IPv6 wins localhost resolution on macOS, so everything sent to the widget landed on Vite instead; the widget's HTTP server now lives on port 6112 (the classic Battle.net game port), with the MCP server, launch script, and README updated to match
 
 ### Changed

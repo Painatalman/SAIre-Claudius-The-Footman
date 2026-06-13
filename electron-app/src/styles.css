@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+html, body {
+  height: 100%;
+}
+
 body {
   background: transparent;
   overflow: hidden;
@@ -16,7 +20,9 @@ body {
 #widget-container {
   position: relative;
   width: 280px;
-  height: 180px;
+  /* Fill the window. The window itself is resized to fit the balloon
+     (anchored at the bottom), so tall messages are never clipped. */
+  height: 100%;
   display: flex;
   /* Anchor to the bottom so the balloon grows upward —
      the widget usually lives at the bottom of the screen */
@@ -83,6 +89,11 @@ body {
   padding: 8px 12px;
   max-width: 200px;
   min-width: 120px;
+  /* Safety net for pathologically long messages: if the request is taller
+     than the screen, the window is clamped and the balloon scrolls instead
+     of clipping. Normal messages fit and never show a scrollbar. */
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
   -webkit-app-region: no-drag;
 }
 

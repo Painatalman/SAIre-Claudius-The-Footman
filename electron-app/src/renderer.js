@@ -1,5 +1,8 @@
 // State management
 let currentState = 'idle';
+
+// Resting window height, matched to BrowserWindow's initial height in main.js
+const DEFAULT_WINDOW_HEIGHT = 180;
 const sounds = {
   workComplete: new Audio('../../assets/sounds/work-completed.mp3'),
   yesMyLord: new Audio('../../assets/sounds/yes-my-lord.mp3'),
@@ -55,11 +58,13 @@ function showBalloon(text, duration = 5000) {
   balloon.classList.remove('hidden');
   balloon.classList.add('balloon-fade-in');
   ipcRenderer.send('balloon-visible', true);
+  requestResize();
 
   if (duration > 0) {
     setTimeout(() => {
       balloon.classList.add('hidden');
       ipcRenderer.send('balloon-visible', false);
+      requestResize();
     }, duration);
   }
 }
@@ -69,6 +74,24 @@ function hideBalloon() {
   const balloon = document.getElementById('speech-balloon');
   balloon.classList.add('hidden');
   ipcRenderer.send('balloon-visible', false);
+  requestResize();
+}
+
+// Resize the window so the whole balloon is visible. The balloon is anchored to
+// the bottom of the window and grows upward, so tall messages are never clipped.
+// When the balloon is hidden, the window returns to its resting height.
+function requestResize() {
+  requestAnimationFrame(() => {
+    const balloon = document.getElementById('speech-balloon');
+    if (!balloon || balloon.classList.contains('hidden')) {
+      ipcRenderer.send('resize-window', { height: DEFAULT_WINDOW_HEIGHT });
+      return;
+    }
+    // scrollHeight is the full content height even when max-height clamps it,
+    // plus the container padding and balloon borders.
+    const needed = balloon.scrollHeight + 40;
+    ipcRenderer.send('resize-window', { height: needed });
+  });
 }
 
 // Change widget state
@@ -128,6 +151,8 @@ function notifyPrompt(question, options = [], promptId = null) {
       });
       container.appendChild(btn);
     });
+    // Buttons add height — resize again now that they're in the DOM
+    requestResize();
   }
 }
 

@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Permission notifications now show the actual request — the Bash command, file path, URL, or prompt (truncated to 160 characters) on a second line — instead of just the tool name; the speech balloon renders the extra line properly
 - Interactive permission prompts — the PermissionRequest hook (`scripts/permission-prompt.mjs`) now shows **Allow**/**Deny** buttons in the balloon and actually approves or blocks the tool call based on your click. The hook is synchronous so it can return the decision to Claude Code; if the widget isn't running or you don't answer within ~55 seconds, it falls back to Claude Code's normal permission dialog
 - Permission prompts display the request literally — the tool name and the exact command, file path, or URL (or the full `tool_input` as JSON for other tools), with no rewording and no truncation
+- Permission prompts now show the real choices Claude offers instead of a fixed Allow/Deny — an **Always allow `<rule>`** button is added for each entry in the payload's `permission_suggestions`, carrying the suggested rule so it can be remembered, alongside plain Allow and Deny
 
 ### Fixed
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildMessage, decisionFor } from './permission-prompt.mjs';
+import { buildMessage, buildOptions } from './permission-prompt.mjs';
 
 test('buildMessage shows the tool name and the literal Bash command', () => {
   const msg = buildMessage({ tool_name: 'Bash', tool_input: { command: 'git push origin main' } });
@@ -39,26 +39,74 @@ test('buildMessage does NOT truncate long commands — the full text is shown', 
   assert.equal(msg, `Bash\n${long}`);
 });
 
-test('decisionFor maps Allow to an allow behavior', () => {
-  assert.deepEqual(decisionFor('Allow'), {
+const allow = { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'allow' } } };
+const deny = { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny' } } };
+
+test('buildOptions offers just Allow and Deny when there are no suggestions', () => {
+  const options = buildOptions({ tool_name: 'Bash', tool_input: { command: 'ls' } });
+  assert.deepEqual(options.map((o) => o.label), ['Allow', 'Deny']);
+  assert.deepEqual(options[0].decision, allow);
+  assert.deepEqual(options[1].decision, deny);
+});
+
+test('buildOptions adds an "Always allow" option from a permission suggestion', () => {
+  const suggestion = {
+    type: 'addRules',
+    rules: [{ toolName: 'Bash', ruleContent: 'pnpm vitest *' }],
+    behavior: 'allow',
+    destination: 'localSettings',
+  };
+  const options = buildOptions({
+    tool_name: 'Bash',
+    tool_input: { command: 'pnpm vitest run' },
+    permission_suggestions: [suggestion],
+  });
+
+  assert.deepEqual(options.map((o) => o.label), [
+    'Allow',
+    'Always allow Bash(pnpm vitest *)',
+    'Deny',
+  ]);
+  // The "always" option carries the suggestion so the rule can persist
+  assert.deepEqual(options[1].decision, {
     hookSpecificOutput: {
       hookEventName: 'PermissionRequest',
-      decision: { behavior: 'allow' },
+      decision: { behavior: 'allow', updatedPermissions: [suggestion] },
     },
   });
 });
 
-test('decisionFor maps Deny to a deny behavior', () => {
-  assert.deepEqual(decisionFor('Deny'), {
-    hookSpecificOutput: {
-      hookEventName: 'PermissionRequest',
-      decision: { behavior: 'deny' },
-    },
+test('buildOptions summarises multiple rules in one suggestion', () => {
+  const options = buildOptions({
+    tool_name: 'Bash',
+    tool_input: { command: 'git push' },
+    permission_suggestions: [
+      {
+        type: 'addRules',
+        rules: [
+          { toolName: 'Bash', ruleContent: 'git push *' },
+          { toolName: 'Bash', ruleContent: 'git commit *' },
+        ],
+        behavior: 'allow',
+        destination: 'localSettings',
+      },
+    ],
   });
+  assert.deepEqual(options.map((o) => o.label), [
+    'Allow',
+    'Always allow Bash(git push *), Bash(git commit *)',
+    'Deny',
+  ]);
 });
 
-test('decisionFor returns null for no answer so the normal dialog is shown', () => {
-  assert.equal(decisionFor(null), null);
-  assert.equal(decisionFor(undefined), null);
-  assert.equal(decisionFor('Maybe'), null);
+test('buildOptions ignores suggestions that are not allow/addRules', () => {
+  const options = buildOptions({
+    tool_name: 'Bash',
+    tool_input: { command: 'rm -rf /' },
+    permission_suggestions: [
+      { type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'rm *' }], behavior: 'deny', destination: 'localSettings' },
+      { type: 'replaceRules', rules: [], behavior: 'allow', destination: 'localSettings' },
+    ],
+  });
+  assert.deepEqual(options.map((o) => o.label), ['Allow', 'Deny']);
 });

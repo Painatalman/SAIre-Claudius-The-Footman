@@ -2,13 +2,17 @@
 // Synchronous PermissionRequest hook for Claude Code.
 //
 // When Claude Code is about to show a permission dialog, this hook asks the
-// Footman widget instead — rendering Allow/Deny buttons in the speech balloon —
-// and blocks until the user clicks. The click is translated into a
-// PermissionRequest decision on stdout, which Claude Code obeys:
+// Footman widget instead — rendering the same choices Claude would offer as
+// buttons in the speech balloon — and blocks until the user clicks. The choices
+// come from the payload: always "Allow" and "Deny", plus an "Always allow …"
+// button for each entry in `permission_suggestions` (the rule Claude suggests
+// remembering). The click is translated into a PermissionRequest decision on
+// stdout:
 //
-//   Allow  -> {hookSpecificOutput:{hookEventName:"PermissionRequest",decision:{behavior:"allow"}}}
-//   Deny   -> {...decision:{behavior:"deny"}}
-//   (none) -> no output, exit 0 -> Claude Code falls back to its normal dialog
+//   Allow         -> {...decision:{behavior:"allow"}}
+//   Always allow… -> {...decision:{behavior:"allow",updatedPermissions:[suggestion]}}
+//   Deny          -> {...decision:{behavior:"deny"}}
+//   (none)        -> no output, exit 0 -> Claude Code falls back to its normal dialog
 //
 // MUST be registered with "async": false. Async hooks cannot return a decision.
 import { randomUUID } from 'node:crypto';
@@ -41,16 +45,39 @@ export function buildMessage(payload = {}) {
   return detail.length > 0 ? `${tool}\n${detail}` : tool;
 }
 
-// Map the user's click to a PermissionRequest decision object, or null to defer
-// to Claude Code's normal permission dialog.
-export function decisionFor(choice) {
-  if (choice === 'Allow') {
-    return { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'allow' } } };
+// A PermissionRequest decision object wrapping the given decision body.
+function decision(body) {
+  return { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: body } };
+}
+
+// Build the option buttons from the payload: the choices Claude Code itself
+// would offer. Beyond plain Allow/Deny, each entry in `permission_suggestions`
+// (e.g. {type:"addRules", rules:[{toolName, ruleContent}], behavior:"allow"})
+// becomes an "Always allow …" option that carries the suggestion so the rule
+// can be persisted. Returns [{ label, decision }] — the label is shown as a
+// button and the decision is emitted when that button is clicked.
+export function buildOptions(payload = {}) {
+  const options = [{ label: 'Allow', decision: decision({ behavior: 'allow' }) }];
+
+  const suggestions = Array.isArray(payload.permission_suggestions) ? payload.permission_suggestions : [];
+  for (const suggestion of suggestions) {
+    if (
+      suggestion &&
+      suggestion.type === 'addRules' &&
+      suggestion.behavior === 'allow' &&
+      Array.isArray(suggestion.rules) &&
+      suggestion.rules.length > 0
+    ) {
+      const summary = suggestion.rules.map((r) => `${r.toolName}(${r.ruleContent})`).join(', ');
+      options.push({
+        label: `Always allow ${summary}`,
+        decision: decision({ behavior: 'allow', updatedPermissions: [suggestion] }),
+      });
+    }
   }
-  if (choice === 'Deny') {
-    return { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny' } } };
-  }
-  return null;
+
+  options.push({ label: 'Deny', decision: decision({ behavior: 'deny' }) });
+  return options;
 }
 
 function readStdin() {
@@ -63,16 +90,16 @@ function readStdin() {
   });
 }
 
-// Show the Allow/Deny prompt in the widget. Reuses the existing prompt flow,
-// so the renderer needs no changes.
-async function sendPrompt(promptId, message, sessionId) {
+// Show the prompt and its option buttons in the widget. Reuses the existing
+// prompt flow, so the renderer needs no changes.
+async function sendPrompt(promptId, message, labels, sessionId) {
   const res = await fetch(`${FOOTMAN_BASE}/notify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       type: 'prompt',
       message,
-      options: ['Allow', 'Deny'],
+      options: labels,
       promptId,
       sessionId,
     }),
@@ -107,10 +134,11 @@ async function main() {
   }
 
   const promptId = randomUUID();
+  const options = buildOptions(payload);
 
   let sent = false;
   try {
-    sent = await sendPrompt(promptId, buildMessage(payload), payload.session_id);
+    sent = await sendPrompt(promptId, buildMessage(payload), options.map((o) => o.label), payload.session_id);
   } catch {
     sent = false;
   }
@@ -119,10 +147,11 @@ async function main() {
   if (!sent) process.exit(0);
 
   const choice = await waitForChoice(promptId, Date.now() + RESPONSE_TIMEOUT_MS);
-  const decision = decisionFor(choice);
+  const picked = options.find((o) => o.label === choice);
 
-  if (decision) {
-    process.stdout.write(JSON.stringify(decision));
+  // No click (or an unrecognised one) — emit nothing so the normal dialog shows.
+  if (picked) {
+    process.stdout.write(JSON.stringify(picked.decision));
   }
   process.exit(0);
 }

@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PermissionRequest hook documented in the README — the Footman now announces "Permission needed: `<tool name>`" whenever a session shows a permission dialog
 - Full setup and reference guide in the README — MCP server registration, all five Claude Code hooks explained, manual run instructions, widget behavior, HTTP API, wired sounds, and troubleshooting
 - Permission notifications now show the actual request — the Bash command, file path, URL, or prompt (truncated to 160 characters) on a second line — instead of just the tool name; the speech balloon renders the extra line properly
+- Interactive permission prompts — the PermissionRequest hook (`scripts/permission-prompt.mjs`) now shows **Allow**/**Deny** buttons in the balloon and actually approves or blocks the tool call based on your click. The hook is synchronous so it can return the decision to Claude Code; if the widget isn't running or you don't answer within ~55 seconds, it falls back to Claude Code's normal permission dialog
 
 ### Fixed
 

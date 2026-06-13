@@ -111,7 +111,7 @@ The MCP tools only fire when Claude chooses to call them. For deterministic noti
             "type": "command",
             "async": true,
             "timeout": 5,
-            "command": "jq -c '{type:\"prompt\",message:(.message // \"My lord?\"),sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+            "command": "jq -c 'if .notification_type == \"permission_prompt\" then empty else {type:\"prompt\",message:(.message // \"My lord?\"),sessionId:.session_id} end' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -122,9 +122,8 @@ The MCP tools only fire when Claude chooses to call them. For deterministic noti
         "hooks": [
           {
             "type": "command",
-            "async": true,
-            "timeout": 5,
-            "command": "jq -c '{type:\"prompt\",message:((\"Permission needed: \" + (.tool_name // \"a tool\")) + (((.tool_input.command // .tool_input.file_path // .tool_input.url // .tool_input.prompt // \"\") | tostring) as $d | if ($d | length) > 0 then \"\\n\" + $d[0:160] else \"\" end)),sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+            "timeout": 60,
+            "command": "/usr/local/bin/node /ABSOLUTE/PATH/TO/mask-ot/scripts/permission-prompt.mjs"
           }
         ]
       }
@@ -151,11 +150,11 @@ What each hook does:
 - **SessionStart** → runs `launch-footman.sh`: starts the widget if it isn't running, then registers the session with the counter
 - **UserPromptSubmit** → working state ("At once, sire!", animated ellipsis)
 - **Stop** → completion ("Work complete!")
-- **Notification** → prompt state with the notification text ("My lord?") — fires on idle nudges
-- **PermissionRequest** → prompt state with the tool name and the actual request — the Bash command, file path, or URL — truncated to 160 chars ("My lord?")
+- **Notification** → prompt state with the notification text ("My lord?") — fires on idle nudges. Permission notifications are skipped here so they don't clobber the Allow/Deny buttons; those are handled by **PermissionRequest** below
+- **PermissionRequest** → shows the request in the balloon ("May I run this command, my lord?" plus the command/path/URL) with **Allow** and **Deny** buttons. Clicking Allow lets the tool run; clicking Deny blocks it. This hook is **synchronous** — Claude Code waits for your click. If you don't answer within ~55 seconds, or the widget isn't running, the hook exits cleanly and Claude Code falls back to its own permission dialog. Replace `/ABSOLUTE/PATH/TO/mask-ot` with the real path to this repo.
 - **SessionEnd** → removes the session from the counter
 
-All hooks are async with short timeouts and failure suppression — if the widget isn't running, Claude Code is unaffected.
+Every hook except **PermissionRequest** is async with short timeouts and failure suppression — if the widget isn't running, Claude Code is unaffected. PermissionRequest is intentionally synchronous so it can return your Allow/Deny decision, but it always degrades to the normal dialog when the widget is unavailable or you don't respond in time.
 
 ### 4. Restart Claude Code
 

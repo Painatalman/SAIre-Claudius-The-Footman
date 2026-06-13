@@ -1,7 +1,9 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const server = require('./server');
+
+let tray = null;
 
 // Allow sounds to play without a user gesture
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -146,10 +148,45 @@ function startClickThroughPolling() {
   }, 100);
 }
 
+// Move the widget back to its default bottom-right spot (handy if it drifts
+// off-screen — there's no dock icon to fall back on).
+function resetWindowPosition() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const { workArea } = screen.getPrimaryDisplay();
+  const x = workArea.x + workArea.width - 300;
+  const y = workArea.y + workArea.height - 200;
+  mainWindow.setPosition(x, y);
+  mainWindow.show();
+  savePosition();
+}
+
+// macOS menu-bar (tray) icon — the Footman lives in the top bar instead of the
+// dock, with a small menu to show/hide it, recentre it, or quit.
+function createTray() {
+  const iconPath = path.join(__dirname, '..', '..', 'assets', 'sprites', 'helmetTemplate.png');
+  const icon = nativeImage.createFromPath(iconPath);
+  icon.setTemplateImage(true); // adapt to light/dark menu bar
+
+  tray = new Tray(icon);
+  tray.setToolTip('Footman');
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Show Footman', click: () => mainWindow && mainWindow.show() },
+    { label: 'Hide Footman', click: () => mainWindow && mainWindow.hide() },
+    { type: 'separator' },
+    { label: 'Reset position', click: resetWindowPosition },
+    { type: 'separator' },
+    { label: 'Quit Footman', click: () => app.quit() },
+  ]));
+}
+
 app.whenReady().then(() => {
+  // Run as a menu-bar accessory: no dock icon, just the tray icon up top.
+  if (process.platform === 'darwin' && app.dock) app.dock.hide();
+
   createWindow();
   server.start();
   startClickThroughPolling();
+  createTray();
 });
 
 app.on('window-all-closed', () => {

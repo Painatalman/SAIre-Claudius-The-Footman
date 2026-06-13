@@ -165,6 +165,15 @@ body {
   opacity: 0.55;
 }
 
+/* Session label beside working/prompt lines */
+.session-tag {
+  margin-left: 6px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: #8b6f47;
+  vertical-align: middle;
+}
+
 /* Clickable answer options inside a prompt message */
 .balloon-options {
   display: flex;

@@ -35,19 +35,19 @@ function storeResponse(id, choice) {
 
 // Notification endpoint
 app.post('/notify', (req, res) => {
-  const { type, message, options, sessionId, promptId } = req.body;
+  const { type, message, options, sessionId, promptId, cwd } = req.body;
 
   if (!mainWindow || mainWindow.isDestroyed()) {
     return res.status(500).json({ error: 'Widget not ready' });
   }
 
-  console.log('Received notification:', { type, message, sessionId, promptId });
+  console.log('Received notification:', { type, message, sessionId, promptId, cwd });
 
   // A new interactive prompt starts out alive.
   if (type === 'prompt' && promptId) markPromptAlive(promptId);
 
   // Send to renderer process
-  mainWindow.webContents.send('notification', { type, message, options, sessionId, promptId });
+  mainWindow.webContents.send('notification', { type, message, options, sessionId, promptId, cwd });
 
   res.json({ success: true });
 });

@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive permission prompts — the PermissionRequest hook (`scripts/permission-prompt.mjs`) now shows **Allow**/**Deny** buttons in the balloon and actually approves or blocks the tool call based on your click. The hook is synchronous so it can return the decision to Claude Code; if the widget isn't running or you don't answer within ~55 seconds, it falls back to Claude Code's normal permission dialog
 - Permission prompts display the request literally — the tool name and the exact command, file path, or URL (or the full `tool_input` as JSON for other tools), with no rewording and no truncation
 - Permission prompts now show the real choices Claude offers instead of a fixed Allow/Deny — an **Always allow `<rule>`** button is added for each entry in the payload's `permission_suggestions`, carrying the suggested rule so it can be remembered, alongside plain Allow and Deny
+- Messages are now labelled and colour-coded by session — each session gets a stable colour accent and is named by its project (folder) name, so concurrent sessions are easy to tell apart; the project comes from the session's working directory, passed through the hooks
+- The working status is a single consolidated line — "Working…" for one project, or "Working on `<a>`, `<b>`…" listing each active project (each in its own colour) when several sessions are busy at once
 
 ### Fixed
 
@@ -34,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Widget layout is now anchored to the bottom so the speech balloon grows upward — long prompts no longer run off-screen when the widget sits in the bottom corner
 - Long balloon messages are no longer clipped by the fixed 280×180 window — the window now grows taller to fit the balloon (anchored at the bottom so it expands upward) and shrinks back when the balloon hides; messages taller than the screen scroll inside the balloon instead of being cut off
 - Notifications silently vanishing when another project's Vite dev server bound `[::1]:3000` — IPv6 wins localhost resolution on macOS, so everything sent to the widget landed on Vite instead; the widget's HTTP server now lives on port 6112 (the classic Battle.net game port), with the MCP server, launch script, and README updated to match
+- The speech balloon now stacks recent messages instead of overwriting them — the working status, a completion, and several permission prompts can show at once, with transient ones fading as they age
+- Multiple permission prompts can be pending at the same time, each with its own buttons and answered independently, instead of a new prompt wiping out the previous one's options
+- Answering a prompt now returns the Footman to the "Working…" status (and marks the session as at work again) instead of dropping to idle
+- Permission prompts that were answered in Claude Code's own dialog, or that timed out, now dismiss themselves instead of lingering — the widget tracks which prompts still have something waiting on an answer and clears the rest
 
 ### Changed
 

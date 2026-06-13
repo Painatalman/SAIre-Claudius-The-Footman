@@ -56,14 +56,18 @@ let messages = [];        // { id, type, text, persistent, settled, timer, promp
 let messageSeq = 0;
 let balloonShown = false;
 
+// Remember each session's working directory so we can label its messages with a
+// human-readable project (folder) name instead of a raw session id.
+const sessionCwd = new Map();
+
 // Add a message to the stack. Returns its id. `opts` may carry prompt details
 // (promptId, options, sessionId) for messages of type 'prompt'.
 function pushMessage(type, text, opts = {}) {
-  const { persistent = false, duration = 5000, promptId = null, options = null, sessionId = null } = opts;
+  const { persistent = false, duration = 5000, promptId = null, options = null, sessionId = null, workingSessions = null } = opts;
   const id = ++messageSeq;
   const message = {
     id, type, text, persistent, settled: false, timer: null,
-    promptId, options, sessionId, answered: false, shownAt: Date.now(),
+    promptId, options, sessionId, workingSessions, answered: false, shownAt: Date.now(),
   };
   messages.push(message);
 
@@ -91,17 +95,57 @@ function removeMessage(id) {
   renderStack();
 }
 
-// Turn any running "working" message into settled history that fades out, so
-// the only animated line is the current task.
-function settleWork() {
-  for (const m of messages) {
-    if (m.type === 'working' && !m.settled) {
-      m.settled = true;
-      m.persistent = false;
-      if (m.timer) clearTimeout(m.timer);
-      m.timer = setTimeout(() => removeMessage(m.id), 4000);
-    }
+// A short, stable id fragment, used when no project name is known yet.
+function shortSession(id) {
+  const s = String(id || '');
+  return s.length > 8 ? `#${s.slice(0, 8)}` : `#${s}`;
+}
+
+// A human-readable label for a session: its project (folder) name when we know
+// the working directory, otherwise a short id fragment.
+function sessionLabel(sessionId) {
+  const cwd = sessionCwd.get(sessionId);
+  if (cwd) {
+    const name = String(cwd).split('/').filter(Boolean).pop();
+    if (name) return name;
   }
+  return sessionId ? shortSession(sessionId) : '';
+}
+
+// A stable colour derived from the session id, so each session's messages share
+// a distinct accent. Dark enough to read against the cream balloon.
+function sessionColor(sessionId) {
+  if (!sessionId) return null;
+  const s = String(sessionId);
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) % 360;
+  return `hsl(${hash}, 60%, 36%)`;
+}
+
+// Render the consolidated working line: "Working…" for a single project, or
+// "Working on a, b, c…" (each project coloured) when several sessions are busy.
+function renderWorkingLabel(label, m) {
+  const ids = m.workingSessions || [];
+  if (ids.length <= 1) {
+    label.appendChild(document.createTextNode('Working'));
+  } else {
+    label.appendChild(document.createTextNode('Working on '));
+    ids.forEach((sid, i) => {
+      const span = document.createElement('span');
+      span.textContent = sessionLabel(sid);
+      const c = sessionColor(sid);
+      if (c) {
+        span.style.color = c;
+        span.style.fontWeight = 'bold';
+      }
+      label.appendChild(span);
+      if (i < ids.length - 1) label.appendChild(document.createTextNode(', '));
+    });
+  }
+  const dots = document.createElement('span');
+  dots.className = 'working-dots';
+  dots.innerHTML = '<span>.</span><span>.</span><span>.</span>';
+  label.appendChild(dots);
 }
 
 function clearStack() {
@@ -121,13 +165,27 @@ function renderStack() {
     const line = document.createElement('div');
     line.className = `balloon-msg balloon-msg-${m.type}${m.settled ? ' balloon-msg-settled' : ''}`;
 
+    // Colour-code each line by session so concurrent sessions are easy to tell
+    // apart at a glance.
+    const colour = sessionColor(m.sessionId);
+    if (colour) {
+      line.style.borderLeft = `3px solid ${colour}`;
+      line.style.paddingLeft = '6px';
+    }
+
     const label = document.createElement('div');
-    label.textContent = m.text;
-    if (m.type === 'working' && !m.settled) {
-      const dots = document.createElement('span');
-      dots.className = 'working-dots';
-      dots.innerHTML = '<span>.</span><span>.</span><span>.</span>';
-      label.appendChild(dots);
+    if (m.type === 'working') {
+      renderWorkingLabel(label, m);
+    } else {
+      label.textContent = m.text;
+      // Tag a prompt with its session's project name.
+      if (m.sessionId && m.type === 'prompt') {
+        const tag = document.createElement('span');
+        tag.className = 'session-tag';
+        tag.textContent = sessionLabel(m.sessionId);
+        if (colour) tag.style.color = colour;
+        label.appendChild(tag);
+      }
     }
     line.appendChild(label);
 
@@ -248,35 +306,43 @@ function playSound(soundName) {
   }
 }
 
-// Notification handlers — each adds to the stack instead of replacing it.
-function notifyWorkComplete(message = 'Work complete!') {
-  settleWork();
-  pushMessage('complete', message, { duration: 6000 });
-  playSound('workComplete');
-}
+// Maintain the single, consolidated working line from the set of sessions that
+// are currently working. One project → "Working…"; several → a project list.
+function refreshWorking() {
+  const ids = [...sessions.entries()].filter(([, s]) => s.state === 'working').map(([id]) => id);
+  const existing = messages.find((m) => m.type === 'working');
 
-function notifyWorking(taskDescription = 'Working') {
-  // Strip any trailing dots — the animated ellipsis replaces them.
-  const text = taskDescription.replace(/\.+\s*$/, '');
-  const active = messages.find((m) => m.type === 'working' && !m.settled);
-  if (active) {
-    // Same ongoing task — update it in place rather than stacking duplicates.
-    active.text = text;
+  if (ids.length === 0) {
+    if (existing) removeMessage(existing.id);
+    return;
+  }
+
+  if (existing) {
+    existing.workingSessions = ids;
+    existing.sessionId = ids.length === 1 ? ids[0] : null; // colour the line when there's just one
     renderStack();
   } else {
-    pushMessage('working', text, { persistent: true });
+    pushMessage('working', 'Working', {
+      persistent: true,
+      sessionId: ids.length === 1 ? ids[0] : null,
+      workingSessions: ids,
+    });
     playSound('atOnceSire');
   }
 }
 
-function notifyError(message = 'Something went wrong') {
-  settleWork();
-  pushMessage('error', message, { duration: 8000 });
+// Notification handlers — each adds to the stack instead of replacing it.
+function notifyWorkComplete(message = 'Work complete!', sessionId = null) {
+  pushMessage('complete', message, { duration: 6000, sessionId });
+  playSound('workComplete');
+}
+
+function notifyError(message = 'Something went wrong', sessionId = null) {
+  pushMessage('error', message, { duration: 8000, sessionId });
   playSound('error');
 }
 
 function notifyPrompt(question, options = [], promptId = null, sessionId = null) {
-  settleWork();
   const hasOptions = promptId && Array.isArray(options) && options.length > 0;
   if (hasOptions) {
     // An answerable prompt — keep it until answered or dismissed by liveness.
@@ -304,9 +370,9 @@ function answerPrompt(message, option) {
   pushMessage('ack', 'As you wish!', { duration: 3000 });
   playSound('asYouWish');
 
-  // Back to work.
+  // Back to work — mark this session working again and refresh the working line.
   touchSession(message.sessionId, 'working');
-  pushMessage('working', 'Working', { persistent: true });
+  refreshWorking();
 }
 
 // Mock notification system for testing
@@ -318,10 +384,12 @@ function startMockNotifications() {
     step++;
     switch (step % 5) {
       case 0:
+        endSession('mock-session');
         clearStack();
         break;
       case 1:
-        notifyWorking('Building project...');
+        touchSession('mock-session', 'working');
+        refreshWorking();
         break;
       case 2:
         notifyWorkComplete('Build successful!');
@@ -382,24 +450,30 @@ setInterval(() => {
 const { ipcRenderer } = require('electron');
 
 ipcRenderer.on('notification', (event, data) => {
-  const { type, message, options, sessionId, promptId } = data;
+  const { type, message, options, sessionId, promptId, cwd } = data;
+
+  // Remember the session's project directory for its human-readable label.
+  if (sessionId && cwd) sessionCwd.set(sessionId, cwd);
 
   switch (type) {
     case 'task_complete':
       touchSession(sessionId, 'idle');
-      notifyWorkComplete(message);
+      notifyWorkComplete(message, sessionId);
+      refreshWorking();
       break;
     case 'task_working':
       touchSession(sessionId, 'working');
-      notifyWorking(message);
+      refreshWorking();
       break;
     case 'prompt':
       touchSession(sessionId, 'awaiting');
       notifyPrompt(message, options, promptId, sessionId);
+      refreshWorking();
       break;
     case 'error':
       touchSession(sessionId, 'idle');
-      notifyError(message);
+      notifyError(message, sessionId);
+      refreshWorking();
       break;
     case 'session_start':
       // Bookkeeping only — no balloon or sound
@@ -407,6 +481,7 @@ ipcRenderer.on('notification', (event, data) => {
       break;
     case 'session_end':
       endSession(sessionId);
+      refreshWorking();
       break;
     default:
       console.warn('Unknown notification type:', type);
@@ -440,5 +515,5 @@ window.FootmanWidget = {
   notifyWorkComplete,
   notifyPrompt,
   notifyError,
-  notifyWorking
+  refreshWorking
 };

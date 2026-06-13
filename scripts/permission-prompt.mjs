@@ -92,7 +92,7 @@ function readStdin() {
 
 // Show the prompt and its option buttons in the widget. Reuses the existing
 // prompt flow, so the renderer needs no changes.
-async function sendPrompt(promptId, message, labels, sessionId) {
+async function sendPrompt(promptId, message, labels, sessionId, cwd) {
   const res = await fetch(`${FOOTMAN_BASE}/notify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -102,6 +102,7 @@ async function sendPrompt(promptId, message, labels, sessionId) {
       options: labels,
       promptId,
       sessionId,
+      cwd,
     }),
   });
   return res.ok;
@@ -138,7 +139,7 @@ async function main() {
 
   let sent = false;
   try {
-    sent = await sendPrompt(promptId, buildMessage(payload), options.map((o) => o.label), payload.session_id);
+    sent = await sendPrompt(promptId, buildMessage(payload), options.map((o) => o.label), payload.session_id, payload.cwd);
   } catch {
     sent = false;
   }

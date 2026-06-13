@@ -85,7 +85,7 @@ The MCP tools only fire when Claude chooses to call them. For deterministic noti
             "type": "command",
             "async": true,
             "timeout": 5,
-            "command": "jq -c '{type:\"task_working\",message:\"Working\",sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+            "command": "jq -c '{type:\"task_working\",message:\"Working\",sessionId:.session_id,cwd:.cwd}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -98,7 +98,7 @@ The MCP tools only fire when Claude chooses to call them. For deterministic noti
             "type": "command",
             "async": true,
             "timeout": 5,
-            "command": "jq -c '{type:\"task_complete\",message:\"Work complete!\",sessionId:.session_id}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+            "command": "jq -c '{type:\"task_complete\",message:\"Work complete!\",sessionId:.session_id,cwd:.cwd}' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -111,7 +111,7 @@ The MCP tools only fire when Claude chooses to call them. For deterministic noti
             "type": "command",
             "async": true,
             "timeout": 5,
-            "command": "jq -c 'if .notification_type == \"permission_prompt\" then empty else {type:\"prompt\",message:(.message // \"My lord?\"),sessionId:.session_id} end' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+            "command": "jq -c 'if .notification_type == \"permission_prompt\" then empty else {type:\"prompt\",message:(.message // \"My lord?\"),sessionId:.session_id,cwd:.cwd} end' | curl -s --max-time 2 -X POST http://localhost:6112/notify -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
           }
         ]
       }

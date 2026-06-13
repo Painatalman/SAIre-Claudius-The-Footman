@@ -23,7 +23,7 @@ if ! curl -s --max-time 1 "$HEALTH_URL" >/dev/null 2>&1; then
   done
 fi
 
-echo "$INPUT" | jq -c '{type:"session_start",sessionId:.session_id}' |
+echo "$INPUT" | jq -c '{type:"session_start",sessionId:.session_id,cwd:.cwd}' |
   curl -s --max-time 2 -X POST "$NOTIFY_URL" -H 'Content-Type: application/json' -d @- >/dev/null 2>&1
 
 exit 0

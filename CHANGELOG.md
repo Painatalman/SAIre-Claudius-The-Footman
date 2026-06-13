@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Permission prompts now show the real choices Claude offers instead of a fixed Allow/Deny — an **Always allow `<rule>`** button is added for each entry in the payload's `permission_suggestions`, carrying the suggested rule so it can be remembered, alongside plain Allow and Deny
 - Messages are now labelled and colour-coded by session — each session gets a stable colour accent and is named by its project (folder) name, so concurrent sessions are easy to tell apart; the project comes from the session's working directory, passed through the hooks
 - The working status is a single consolidated line — "Working…" for one project, or "Working on `<a>`, `<b>`…" listing each active project (each in its own colour) when several sessions are busy at once
+- Click the session counter to expand an overview of which projects are **ongoing** vs **paused**, grouped by project with a `×N` count and a colour per project
+- The Footman now varies what he says per action — e.g. "My Lord?" / "Your command?" for prompts, "As you wish!" / "At your service!" when you answer — each weighted to the more common line and paired with its matching voice line
+- The Footman runs as a macOS **menu-bar app**: a helmet icon in the top bar (no dock icon) with a menu to show/hide the widget, recentre it, or quit
 
 ### Fixed
 

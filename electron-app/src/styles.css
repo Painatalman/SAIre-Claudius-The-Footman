@@ -60,6 +60,14 @@ body {
   border-radius: 4px;
   padding: 2px 6px;
   white-space: nowrap;
+  /* Clickable to expand the ongoing-vs-paused overview */
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+}
+
+#session-status:hover {
+  border-color: #ffd700;
 }
 
 #session-status.hidden {
@@ -172,6 +180,43 @@ body {
   letter-spacing: 0.5px;
   color: #8b6f47;
   vertical-align: middle;
+}
+
+/* Session overview panel (shown by clicking the counter) */
+.session-panel {
+  font-size: 11px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(139, 111, 71, 0.45);
+}
+
+.session-group + .session-group {
+  margin-top: 4px;
+}
+
+.session-group-title {
+  font-size: 10px;
+  font-weight: bold;
+  opacity: 0.8;
+}
+
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 4px;
+}
+
+.session-none {
+  opacity: 0.5;
+}
+
+.session-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #8b6f47;
 }
 
 /* Clickable answer options inside a prompt message */

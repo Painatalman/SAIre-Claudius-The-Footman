@@ -10,8 +10,43 @@ const sounds = {
   awaitingOrders: new Audio('../../assets/sounds/awaiting-orders.mp3'),
   myLord: new Audio('../../assets/sounds/my-lord.mp3'),
   asYouWish: new Audio('../../assets/sounds/as-you-wish.mp3'),
+  yourCommand: new Audio('../../assets/sounds/your-command.mp3'),
+  atYourService: new Audio('../../assets/sounds/at-your-service.mp3'),
   error: new Audio('../../assets/sounds/my-lord.mp3') // Use my-lord for error as placeholder
 };
+
+// Two voice lines per action, weighted — the Footman varies what he says (and
+// the matching sound) so he feels less repetitive. The first is the more common.
+const LINES = {
+  prompt: [
+    { text: 'My Lord?', sound: 'myLord', weight: 3 },
+    { text: 'Your command?', sound: 'yourCommand', weight: 1 },
+  ],
+  ack: [
+    { text: 'As you wish!', sound: 'asYouWish', weight: 3 },
+    { text: 'At your service!', sound: 'atYourService', weight: 1 },
+  ],
+  working: [
+    { sound: 'atOnceSire', weight: 3 },
+    { sound: 'yesMyLord', weight: 1 },
+  ],
+  complete: [
+    { text: 'Work complete!', sound: 'workComplete', weight: 3 },
+    { text: 'It is done, my Lord!', sound: 'workComplete', weight: 1 },
+  ],
+};
+
+// Pick a weighted-random line for an action.
+function pickLine(action) {
+  const lines = LINES[action] || [];
+  const total = lines.reduce((sum, l) => sum + (l.weight || 1), 0);
+  let r = Math.random() * total;
+  for (const l of lines) {
+    r -= l.weight || 1;
+    if (r < 0) return l;
+  }
+  return lines[0] || {};
+}
 
 // Load authentic WC2 Footman portrait
 function loadFootmanPortrait() {
@@ -55,6 +90,7 @@ const MAX_MESSAGES = 6;
 let messages = [];        // { id, type, text, persistent, settled, timer, promptId, options, sessionId, answered, shownAt }
 let messageSeq = 0;
 let balloonShown = false;
+let showSessionPanel = false; // toggled by clicking the session counter
 
 // Remember each session's working directory so we can label its messages with a
 // human-readable project (folder) name instead of a raw session id.
@@ -112,40 +148,117 @@ function sessionLabel(sessionId) {
   return sessionId ? shortSession(sessionId) : '';
 }
 
-// A stable colour derived from the session id, so each session's messages share
-// a distinct accent. Dark enough to read against the cream balloon.
-function sessionColor(sessionId) {
-  if (!sessionId) return null;
-  const s = String(sessionId);
+// A stable colour from a label (project name), so every message for the same
+// project shares one accent. Dark enough to read against the cream balloon.
+function labelColor(label) {
+  if (!label) return null;
   let hash = 0;
-  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) % 360;
+  for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) % 360;
   return `hsl(${hash}, 60%, 36%)`;
+}
+
+// Colour for a session — keyed off its project label, so two sessions in the
+// same project look the same.
+function sessionColor(sessionId) {
+  return labelColor(sessionLabel(sessionId));
+}
+
+// Count sessions per project label, preserving first-seen order.
+function projectCounts(sessionIds) {
+  const counts = new Map();
+  for (const id of sessionIds) {
+    const label = sessionLabel(id);
+    counts.set(label, (counts.get(label) || 0) + 1);
+  }
+  return counts;
 }
 
 // Render the consolidated working line: "Working…" for a single project, or
 // "Working on a, b, c…" (each project coloured) when several sessions are busy.
 function renderWorkingLabel(label, m) {
-  const ids = m.workingSessions || [];
-  if (ids.length <= 1) {
+  const counts = projectCounts(m.workingSessions || []);
+  const projects = [...counts.keys()];
+
+  // A single project (even with several sessions in it) → just "Working…".
+  if (projects.length <= 1) {
     label.appendChild(document.createTextNode('Working'));
   } else {
     label.appendChild(document.createTextNode('Working on '));
-    ids.forEach((sid, i) => {
+    projects.forEach((name, i) => {
+      const count = counts.get(name);
       const span = document.createElement('span');
-      span.textContent = sessionLabel(sid);
-      const c = sessionColor(sid);
+      span.textContent = count > 1 ? `${name} ×${count}` : name;
+      const c = labelColor(name);
       if (c) {
         span.style.color = c;
         span.style.fontWeight = 'bold';
       }
       label.appendChild(span);
-      if (i < ids.length - 1) label.appendChild(document.createTextNode(', '));
+      if (i < projects.length - 1) label.appendChild(document.createTextNode(', '));
     });
   }
   const dots = document.createElement('span');
   dots.className = 'working-dots';
   dots.innerHTML = '<span>.</span><span>.</span><span>.</span>';
   label.appendChild(dots);
+}
+
+// Toggle the session overview, shown by clicking the counter bar.
+function toggleSessionPanel() {
+  showSessionPanel = !showSessionPanel;
+  renderStack();
+}
+
+// A breakdown of known sessions grouped into ongoing (working) and paused
+// (awaiting an answer or idle), each labelled by project and colour.
+function renderSessionPanel(parent) {
+  const entries = [...sessions.entries()];
+  const ongoing = entries.filter(([, s]) => s.state === 'working');
+  const paused = entries.filter(([, s]) => s.state !== 'working');
+
+  const panel = document.createElement('div');
+  panel.className = 'session-panel';
+
+  const group = (icon, title, ids) => {
+    const g = document.createElement('div');
+    g.className = 'session-group';
+
+    const heading = document.createElement('div');
+    heading.className = 'session-group-title';
+    heading.textContent = `${icon} ${title} (${ids.length})`;
+    g.appendChild(heading);
+
+    const counts = projectCounts(ids); // one row per project, with a ×N count
+    if (counts.size === 0) {
+      const none = document.createElement('div');
+      none.className = 'session-row session-none';
+      none.textContent = '—';
+      g.appendChild(none);
+    } else {
+      for (const [name, count] of counts) {
+        const row = document.createElement('div');
+        row.className = 'session-row';
+        const colour = labelColor(name);
+
+        const dot = document.createElement('span');
+        dot.className = 'session-dot';
+        if (colour) dot.style.background = colour;
+        row.appendChild(dot);
+
+        const label = document.createElement('span');
+        label.textContent = count > 1 ? `${name} ×${count}` : name;
+        if (colour) label.style.color = colour;
+        row.appendChild(label);
+
+        g.appendChild(row);
+      }
+    }
+    panel.appendChild(g);
+  };
+
+  group('⚔', 'Ongoing', ongoing.map(([id]) => id));
+  group('💤', 'Paused', paused.map(([id]) => id));
+  parent.appendChild(panel);
 }
 
 function clearStack() {
@@ -161,6 +274,11 @@ function renderStack() {
   const textEl = document.getElementById('balloon-text');
 
   textEl.innerHTML = '';
+
+  // Session overview, shown when the counter bar is clicked.
+  const panelShown = showSessionPanel && sessions.size > 0;
+  if (panelShown) renderSessionPanel(textEl);
+
   for (const m of messages) {
     const line = document.createElement('div');
     line.className = `balloon-msg balloon-msg-${m.type}${m.settled ? ' balloon-msg-settled' : ''}`;
@@ -204,7 +322,7 @@ function renderStack() {
     textEl.appendChild(line);
   }
 
-  const visible = messages.length > 0;
+  const visible = messages.length > 0 || panelShown;
   if (visible && !balloonShown) balloon.classList.add('balloon-fade-in');
   balloon.classList.toggle('hidden', !visible);
   if (!visible) balloon.classList.remove('balloon-fade-in');
@@ -317,24 +435,31 @@ function refreshWorking() {
     return;
   }
 
+  // Colour the line by project when every working session is in the same one.
+  const oneProject = new Set(ids.map(sessionLabel)).size === 1;
+  const colourId = oneProject ? ids[0] : null;
+
   if (existing) {
     existing.workingSessions = ids;
-    existing.sessionId = ids.length === 1 ? ids[0] : null; // colour the line when there's just one
+    existing.sessionId = colourId;
     renderStack();
   } else {
     pushMessage('working', 'Working', {
       persistent: true,
-      sessionId: ids.length === 1 ? ids[0] : null,
+      sessionId: colourId,
       workingSessions: ids,
     });
-    playSound('atOnceSire');
+    playSound(pickLine('working').sound);
   }
 }
 
 // Notification handlers — each adds to the stack instead of replacing it.
 function notifyWorkComplete(message = 'Work complete!', sessionId = null) {
-  pushMessage('complete', message, { duration: 6000, sessionId });
-  playSound('workComplete');
+  const line = pickLine('complete');
+  // Vary the default phrasing, but keep a custom completion message as-is.
+  const text = message && message !== 'Work complete!' ? message : line.text;
+  pushMessage('complete', text, { duration: 6000, sessionId });
+  playSound(line.sound);
 }
 
 function notifyError(message = 'Something went wrong', sessionId = null) {
@@ -344,15 +469,18 @@ function notifyError(message = 'Something went wrong', sessionId = null) {
 
 function notifyPrompt(question, options = [], promptId = null, sessionId = null) {
   const hasOptions = promptId && Array.isArray(options) && options.length > 0;
+  const line = pickLine('prompt');
   if (hasOptions) {
-    // An answerable prompt — keep it until answered or dismissed by liveness.
+    // An answerable prompt — show the request verbatim, keep until resolved.
     pushMessage('prompt', question, { persistent: true, promptId, options, sessionId });
     ensurePromptPolling();
   } else {
-    // A nudge with nothing to act on (e.g. an idle "My lord?") — let it fade.
-    pushMessage('prompt', question, { duration: 6000 });
+    // A nudge with nothing to act on — use a varied greeting unless Claude sent
+    // its own notification text.
+    const text = question && question !== 'My lord?' ? question : line.text;
+    pushMessage('prompt', text, { duration: 6000 });
   }
-  playSound('myLord');
+  playSound(line.sound);
 }
 
 // Deliver the user's choice and return the Footman to the working state —
@@ -367,8 +495,9 @@ function answerPrompt(message, option) {
   if (message.timer) clearTimeout(message.timer);
   message.timer = setTimeout(() => removeMessage(message.id), 2000);
 
-  pushMessage('ack', 'As you wish!', { duration: 3000 });
-  playSound('asYouWish');
+  const line = pickLine('ack');
+  pushMessage('ack', line.text, { duration: 3000 });
+  playSound(line.sound);
 
   // Back to work — mark this session working again and refresh the working line.
   touchSession(message.sessionId, 'working');
@@ -424,13 +553,16 @@ function updateSessionStatus() {
   const states = [...sessions.values()].map(s => s.state);
   if (states.length === 0) {
     bar.classList.add('hidden');
+    if (showSessionPanel) { showSessionPanel = false; renderStack(); }
     return;
   }
   const working = states.filter(s => s === 'working').length;
   const awaiting = states.length - working;
   bar.textContent = `⚔ ${working} · 💤 ${awaiting}`;
-  bar.title = `${states.length} session(s) open — ${working} at work, ${awaiting} awaiting orders`;
+  bar.title = `${states.length} session(s) open — ${working} ongoing, ${awaiting} paused — click for details`;
   bar.classList.remove('hidden');
+  // Keep the open overview in sync as sessions change.
+  if (showSessionPanel) renderStack();
 }
 
 // Prune sessions silent for 6+ hours (closed without a session_end event)
@@ -503,6 +635,10 @@ document.addEventListener('DOMContentLoaded', () => {
   loadFootmanPortrait();
   setState('idle');
   startIdleFidget();
+
+  // Click the session counter to expand/collapse the ongoing-vs-paused overview.
+  const statusBar = document.getElementById('session-status');
+  if (statusBar) statusBar.addEventListener('click', toggleSessionPanel);
 
   // Start mock notifications in development
   if (process.argv && process.argv.includes('--dev')) {

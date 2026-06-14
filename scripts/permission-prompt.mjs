@@ -98,6 +98,9 @@ async function sendPrompt(promptId, message, labels, sessionId, cwd) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       type: 'prompt',
+      // Distinguishes a permission request (rendered with the framed code
+      // preview) from a plain question asked via the footman_prompt MCP tool.
+      kind: 'permission',
       message,
       options: labels,
       promptId,

@@ -99,10 +99,10 @@ const sessionCwd = new Map();
 // Add a message to the stack. Returns its id. `opts` may carry prompt details
 // (promptId, options, sessionId) for messages of type 'prompt'.
 function pushMessage(type, text, opts = {}) {
-  const { persistent = false, duration = 5000, promptId = null, options = null, sessionId = null, workingSessions = null } = opts;
+  const { persistent = false, duration = 5000, promptId = null, options = null, sessionId = null, workingSessions = null, kind = null } = opts;
   const id = ++messageSeq;
   const message = {
-    id, type, text, persistent, settled: false, timer: null,
+    id, type, kind, text, persistent, settled: false, timer: null,
     promptId, options, sessionId, workingSessions, answered: false, shownAt: Date.now(),
   };
   messages.push(message);
@@ -267,12 +267,28 @@ function clearStack() {
   renderStack();
 }
 
-// A permission prompt arrives as "tool\ndetail": the tool name on the first
-// line, then the command / file path / URL / JSON it wants to run. Show the
-// tool name as a heading and the detail in a code preview — long lines scroll
-// sideways instead of wrapping into an unreadable wall of text. A plain nudge
-// (no detail line) just renders as its heading.
+// Tag a message with its session's project name.
+function appendSessionTag(label, m, colour) {
+  if (!m.sessionId) return;
+  const tag = document.createElement('span');
+  tag.className = 'session-tag';
+  tag.textContent = sessionLabel(m.sessionId);
+  if (colour) tag.style.color = colour;
+  label.appendChild(tag);
+}
+
+// Render a prompt's label. Permission requests (kind === 'permission') arrive
+// as "tool\ndetail": the tool name on the first line, then the command / file
+// path / URL / JSON it wants to run — shown as a heading plus a framed code
+// preview that scrolls sideways instead of wrapping. Every other prompt (a
+// plain question from footman_prompt, or a nudge) is just prose.
 function renderPromptLabel(label, m, colour) {
+  if (m.kind !== 'permission') {
+    label.textContent = m.text;
+    appendSessionTag(label, m, colour);
+    return;
+  }
+
   const text = m.text || '';
   const nl = text.indexOf('\n');
   const head = nl === -1 ? text : text.slice(0, nl);
@@ -281,15 +297,7 @@ function renderPromptLabel(label, m, colour) {
   const heading = document.createElement('span');
   heading.textContent = head;
   label.appendChild(heading);
-
-  // Tag the prompt with its session's project name.
-  if (m.sessionId) {
-    const tag = document.createElement('span');
-    tag.className = 'session-tag';
-    tag.textContent = sessionLabel(m.sessionId);
-    if (colour) tag.style.color = colour;
-    label.appendChild(tag);
-  }
+  appendSessionTag(label, m, colour);
 
   if (body) {
     const pre = document.createElement('pre');
@@ -495,12 +503,12 @@ function notifyError(message = 'Something went wrong', sessionId = null) {
   playSound('error');
 }
 
-function notifyPrompt(question, options = [], promptId = null, sessionId = null) {
+function notifyPrompt(question, options = [], promptId = null, sessionId = null, kind = null) {
   const hasOptions = promptId && Array.isArray(options) && options.length > 0;
   const line = pickLine('prompt');
   if (hasOptions) {
     // An answerable prompt — show the request verbatim, keep until resolved.
-    pushMessage('prompt', question, { persistent: true, promptId, options, sessionId });
+    pushMessage('prompt', question, { persistent: true, promptId, options, sessionId, kind });
     ensurePromptPolling();
   } else {
     // A nudge with nothing to act on — use a varied greeting unless Claude sent
@@ -610,7 +618,7 @@ setInterval(() => {
 const { ipcRenderer } = require('electron');
 
 ipcRenderer.on('notification', (event, data) => {
-  const { type, message, options, sessionId, promptId, cwd } = data;
+  const { type, kind, message, options, sessionId, promptId, cwd } = data;
 
   // Remember the session's project directory for its human-readable label.
   if (sessionId && cwd) sessionCwd.set(sessionId, cwd);
@@ -627,7 +635,7 @@ ipcRenderer.on('notification', (event, data) => {
       break;
     case 'prompt':
       touchSession(sessionId, 'awaiting');
-      notifyPrompt(message, options, promptId, sessionId);
+      notifyPrompt(message, options, promptId, sessionId, kind);
       refreshWorking();
       break;
     case 'error':

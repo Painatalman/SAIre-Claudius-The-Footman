@@ -49,7 +49,7 @@ function createWindow() {
   const position = loadPosition();
 
   mainWindow = new BrowserWindow({
-    width: 280,
+    width: 380,
     height: DEFAULT_WINDOW_HEIGHT,
     x: position.x,
     y: position.y,

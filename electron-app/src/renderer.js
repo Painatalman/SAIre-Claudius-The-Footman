@@ -267,6 +267,40 @@ function clearStack() {
   renderStack();
 }
 
+// A permission prompt arrives as "tool\ndetail": the tool name on the first
+// line, then the command / file path / URL / JSON it wants to run. Show the
+// tool name as a heading and the detail in a code preview — long lines scroll
+// sideways instead of wrapping into an unreadable wall of text. A plain nudge
+// (no detail line) just renders as its heading.
+function renderPromptLabel(label, m, colour) {
+  const text = m.text || '';
+  const nl = text.indexOf('\n');
+  const head = nl === -1 ? text : text.slice(0, nl);
+  const body = nl === -1 ? '' : text.slice(nl + 1);
+
+  const heading = document.createElement('span');
+  heading.textContent = head;
+  label.appendChild(heading);
+
+  // Tag the prompt with its session's project name.
+  if (m.sessionId) {
+    const tag = document.createElement('span');
+    tag.className = 'session-tag';
+    tag.textContent = sessionLabel(m.sessionId);
+    if (colour) tag.style.color = colour;
+    label.appendChild(tag);
+  }
+
+  if (body) {
+    const pre = document.createElement('pre');
+    pre.className = 'balloon-code';
+    const code = document.createElement('code');
+    code.textContent = body;
+    pre.appendChild(code);
+    label.appendChild(pre);
+  }
+}
+
 // Render the whole stack. Prompt messages carry their own option buttons, so
 // several prompts can stack and each stays independently answerable.
 function renderStack() {
@@ -294,16 +328,10 @@ function renderStack() {
     const label = document.createElement('div');
     if (m.type === 'working') {
       renderWorkingLabel(label, m);
+    } else if (m.type === 'prompt') {
+      renderPromptLabel(label, m, colour);
     } else {
       label.textContent = m.text;
-      // Tag a prompt with its session's project name.
-      if (m.sessionId && m.type === 'prompt') {
-        const tag = document.createElement('span');
-        tag.className = 'session-tag';
-        tag.textContent = sessionLabel(m.sessionId);
-        if (colour) tag.style.color = colour;
-        label.appendChild(tag);
-      }
     }
     line.appendChild(label);
 

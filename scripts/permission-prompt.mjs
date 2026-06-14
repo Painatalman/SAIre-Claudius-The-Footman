@@ -128,6 +128,13 @@ async function waitForChoice(promptId, deadline) {
   return null;
 }
 
+// Tools whose "permission" is really an interactive question, not an allow/deny.
+// A PermissionRequest decision can only allow/deny — it can't carry the user's
+// answer — so showing these as Allow/Deny prompts (with their raw tool_input as
+// "code") is wrong. Defer them to Claude Code's own question UI instead; a
+// dedicated PreToolUse hook can render them in the widget if desired.
+const QUESTION_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
+
 async function main() {
   let payload = {};
   try {
@@ -136,6 +143,9 @@ async function main() {
     // Malformed input — defer to the normal dialog.
     process.exit(0);
   }
+
+  // Not a real permission — let Claude Code handle the interaction natively.
+  if (QUESTION_TOOLS.has(payload.tool_name)) process.exit(0);
 
   const promptId = randomUUID();
   const options = buildOptions(payload);

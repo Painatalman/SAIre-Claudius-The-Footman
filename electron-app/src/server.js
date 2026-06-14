@@ -95,9 +95,21 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', widget: mainWindow && !mainWindow.isDestroyed() });
 });
 
-function start() {
-  app.listen(PORT, () => {
+// onError is called if the port can't be bound — typically EADDRINUSE because
+// another Footman instance won the startup race. The caller quits gracefully
+// instead of letting the unhandled error crash the process.
+function start(onError) {
+  const httpServer = app.listen(PORT, () => {
     console.log(`Footman notification server listening on http://localhost:${PORT}`);
+  });
+
+  httpServer.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} already in use — another Footman is running. Exiting.`);
+    } else {
+      console.error('Footman server error:', err);
+    }
+    if (typeof onError === 'function') onError(err);
   });
 }
 

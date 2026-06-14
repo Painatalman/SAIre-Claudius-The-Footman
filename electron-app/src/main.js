@@ -5,6 +5,14 @@ const server = require('./server');
 
 let tray = null;
 
+// Only one Footman may run. On startup several Claude Code sessions fire their
+// SessionStart hook at once and race to launch Electron before any of them has
+// bound port 6112, so the shell health-check guard isn't enough on its own.
+// The single-instance lock is the authoritative guard: losers quit immediately.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+
 // Allow sounds to play without a user gesture
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
@@ -184,7 +192,9 @@ app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock) app.dock.hide();
 
   createWindow();
-  server.start();
+  // If the port is already taken we lost the startup race — quit cleanly
+  // rather than crashing on the unhandled EADDRINUSE.
+  server.start(() => app.quit());
   startClickThroughPolling();
   createTray();
 });
@@ -200,3 +210,5 @@ app.on('activate', () => {
     createWindow();
   }
 });
+
+} // end single-instance guard

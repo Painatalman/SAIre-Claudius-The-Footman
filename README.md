@@ -9,6 +9,8 @@ A footman portrait sits in a corner of your screen, glowing with a golden aura w
 - `electron-app/` — the desktop widget (Electron, always-on-top, draggable)
 - `mcp-server/` — MCP server exposing Footman tools to Claude Code
 - `scripts/launch-footman.sh` — SessionStart hook script (auto-launch + session registration)
+- `scripts/permission-prompt.mjs` — PermissionRequest hook (Allow/Deny buttons in the balloon)
+- `scripts/ask-question-prompt.mjs` — PreToolUse hook for `AskUserQuestion` (renders Claude's questions as buttons)
 - `assets/` — portrait sprite and WC2 voice lines (MP3)
 
 ## Requirements
@@ -128,6 +130,18 @@ The MCP tools only fire when Claude chooses to call them. For deterministic noti
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 300,
+            "command": "/usr/local/bin/node /ABSOLUTE/PATH/TO/mask-ot/scripts/ask-question-prompt.mjs"
+          }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "matcher": "",
@@ -152,9 +166,10 @@ What each hook does:
 - **Stop** → completion ("Work complete!")
 - **Notification** → prompt state with the notification text ("My lord?") — fires on idle nudges. Permission notifications are skipped here so they don't clobber the Allow/Deny buttons; those are handled by **PermissionRequest** below
 - **PermissionRequest** → shows the request in the balloon **literally** — the tool name and the exact request (the Bash command, file path, or URL; or the whole `tool_input` as JSON for other tools), shown in full with no truncation — and offers the **same choices Claude Code would**: **Allow**, **Deny**, and an **Always allow `<rule>`** button for each entry Claude provides in the payload's `permission_suggestions` (so you can approve once or remember the rule). The balloon grows upward to fit the message, so long commands are never cut off. This hook is **synchronous** — Claude Code waits for your click. If you don't answer within ~55 seconds, or the widget isn't running, the hook exits cleanly and Claude Code falls back to its own permission dialog. Replace `/ABSOLUTE/PATH/TO/mask-ot` with the real path to this repo.
+- **PreToolUse** (`AskUserQuestion`) → renders Claude's own multiple-choice questions in the balloon, with each option as a clickable button, and returns your pick as the tool's answer. Unlike a permission request, a question can't be answered by an Allow/Deny decision, so it needs this dedicated handler. Also **synchronous** — Claude Code waits for your answer. If you don't answer within ~5 minutes, the widget isn't running, or the question is one this handler doesn't cover yet (multi-select, or no options), it exits cleanly and Claude Code shows its native question picker. Replace `/ABSOLUTE/PATH/TO/mask-ot` with the real path to this repo. (The companion `permission-prompt.mjs` skips `AskUserQuestion` and `ExitPlanMode` for the same reason — they're questions, not permissions.)
 - **SessionEnd** → removes the session from the counter
 
-Every hook except **PermissionRequest** is async with short timeouts and failure suppression — if the widget isn't running, Claude Code is unaffected. PermissionRequest is intentionally synchronous so it can return your Allow/Deny decision, but it always degrades to the normal dialog when the widget is unavailable or you don't respond in time.
+Every hook except **PermissionRequest** and **PreToolUse** is async with short timeouts and failure suppression — if the widget isn't running, Claude Code is unaffected. Those two are intentionally synchronous so they can return your decision (Allow/Deny, or a chosen answer), but both always degrade to the normal dialog when the widget is unavailable or you don't respond in time.
 
 ### 4. Restart Claude Code
 

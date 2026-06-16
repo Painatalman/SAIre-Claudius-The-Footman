@@ -309,6 +309,63 @@ function renderPromptLabel(label, m, colour) {
   }
 }
 
+// Render the "Other…" affordance beneath a question's preset options: a button
+// that, once clicked, becomes a text field for a custom answer. The open state
+// and typed text live on the message so a re-render (e.g. a new notification
+// arriving) doesn't discard a half-typed answer.
+function renderOtherOption(opts, m) {
+  if (!m.otherOpen) {
+    const other = document.createElement('button');
+    other.className = 'balloon-option balloon-option-other';
+    other.textContent = 'Other…';
+    other.addEventListener('click', () => { m.otherOpen = true; renderStack(); });
+    opts.appendChild(other);
+    return;
+  }
+
+  const form = document.createElement('div');
+  form.className = 'balloon-other';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'balloon-other-input';
+  input.placeholder = 'Type your answer…';
+  input.value = m.otherText || '';
+  input.addEventListener('input', () => { m.otherText = input.value; });
+
+  const submit = () => {
+    const text = input.value.trim();
+    if (text) answerPrompt(m, text);
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      m.otherOpen = false;
+      m.otherText = '';
+      renderStack();
+    }
+  });
+
+  const send = document.createElement('button');
+  send.className = 'balloon-option balloon-other-send';
+  send.textContent = 'Send';
+  send.addEventListener('click', submit);
+
+  form.appendChild(input);
+  form.appendChild(send);
+  opts.appendChild(form);
+
+  // Put the caret in the field when it first opens (and keep it at the end if a
+  // re-render rebuilds the input mid-answer).
+  setTimeout(() => {
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }, 0);
+}
+
 // Render the whole stack. Prompt messages carry their own option buttons, so
 // several prompts can stack and each stays independently answerable.
 function renderStack() {
@@ -353,6 +410,7 @@ function renderStack() {
         btn.addEventListener('click', () => answerPrompt(m, option));
         opts.appendChild(btn);
       });
+      renderOtherOption(opts, m);
       line.appendChild(opts);
     }
     textEl.appendChild(line);

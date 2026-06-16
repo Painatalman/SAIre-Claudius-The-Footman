@@ -58,6 +58,14 @@ test('buildDecision maps each question to its chosen label and keeps the input',
   });
 });
 
+test('buildDecision accepts a custom (free-text) answer from "Other"', () => {
+  const decision = buildDecision(singleSelect.tool_input, ['Somewhere else entirely']);
+  assert.equal(
+    decision.hookSpecificOutput.updatedInput.answers['Where should the link live?'],
+    'Somewhere else entirely',
+  );
+});
+
 test('buildDecision handles multiple questions aligned to picks', () => {
   const input = {
     questions: [

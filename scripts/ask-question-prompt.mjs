@@ -4,9 +4,10 @@
 // AskUserQuestion isn't a permission to grant — it's a question to answer — so
 // it can't be served by the PermissionRequest hook, whose decision can only
 // allow/deny and carries no answer. This PreToolUse hook instead renders each
-// question in the Footman widget with its options as buttons, waits for the
-// user's pick, and returns the answer via permissionDecision:"allow" plus
-// updatedInput.answers, so the tool runs already answered.
+// question in the Footman widget with its options as buttons (plus an "Other…"
+// field for a custom free-text answer), waits for the user's pick, and returns
+// the answer via permissionDecision:"allow" plus updatedInput.answers, so the
+// tool runs already answered.
 //
 //   answered                         -> {permissionDecision:"allow", updatedInput:{...input, answers}}
 //   no widget / no answer / unsupported -> no output, exit 0 -> Claude Code's native picker shows
@@ -116,8 +117,10 @@ async function main() {
     if (!sent) process.exit(0); // Widget down — defer the whole call.
 
     const choice = await waitForChoice(promptId, deadline);
-    // No answer, a timeout, or an unrecognised label — defer to the native UI.
-    if (choice == null || !labels.includes(choice)) process.exit(0);
+    // A preset label, or free text the user typed via "Other" — both are valid
+    // answers. Only a missing/empty answer (e.g. a timeout) defers to the
+    // native picker.
+    if (typeof choice !== 'string' || choice.trim() === '') process.exit(0);
     picks.push(choice);
   }
 

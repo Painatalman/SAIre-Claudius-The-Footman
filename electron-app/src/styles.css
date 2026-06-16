@@ -102,6 +102,9 @@ body {
      of clipping. Normal messages fit and never show a scrollbar. */
   max-height: calc(100vh - 24px);
   overflow-y: auto;
+  /* Lift the balloon off the bottom so its tail lines up with the footman's
+     mouth rather than his chin (the column is bottom-aligned). */
+  margin-bottom: 22px;
   -webkit-app-region: no-drag;
 }
 
@@ -287,6 +290,38 @@ body {
 
 .balloon-option:hover {
   background: #ffd700;
+}
+
+/* "Other…" — answer a question with custom free text instead of a preset */
+.balloon-option-other {
+  font-style: italic;
+}
+
+.balloon-other {
+  display: flex;
+  gap: 4px;
+}
+
+.balloon-other-input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 3px 8px;
+  background: #fff8ec;
+  color: #3d2817;
+  border: 1px solid #8b6f47;
+  border-radius: 4px;
+  -webkit-app-region: no-drag;
+}
+
+.balloon-other-input:focus {
+  outline: none;
+  border-color: #ffd700;
+}
+
+.balloon-other-send {
+  flex: 0 0 auto;
 }
 
 /* Animation States */

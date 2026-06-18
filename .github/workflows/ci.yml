@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scripts-tests:
+    name: scripts · node:test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run unit tests
+        working-directory: scripts
+        run: node --test
+
+  mcp-server:
+    name: mcp-server · install + syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+      - name: Install dependencies
+        working-directory: mcp-server
+        run: npm ci
+      - name: Syntax check
+        working-directory: mcp-server
+        run: node --check index.js
+
+  electron-app:
+    name: electron-app · install + syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: electron-app/package-lock.json
+      - name: Install dependencies
+        working-directory: electron-app
+        run: npm ci
+      - name: Syntax check sources
+        working-directory: electron-app
+        run: |
+          for f in $(find src -name '*.js'); do
+            echo "checking $f"
+            node --check "$f"
+          done

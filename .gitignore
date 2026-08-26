@@ -17,6 +17,9 @@ build/
 .env
 .env.local
 
+# Personal skin choice (footman.config.example.json is the template)
+footman.config.json
+
 # Editor
 .vscode/
 .idea/

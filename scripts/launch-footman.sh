@@ -23,7 +23,20 @@ if ! curl -s --max-time 1 "$HEALTH_URL" >/dev/null 2>&1; then
   done
 fi
 
-echo "$INPUT" | jq -c '{type:"session_start",sessionId:.session_id,cwd:.cwd}' |
+# A name to show beside the project, if there is one to show. The payload is not
+# documented to carry a name today, so the plausible keys are tried in order and
+# FOOTMAN_SESSION_NAME is the fallback; with neither, `name` is null and the
+# widget labels the session by project alone.
+echo "$INPUT" | jq -c --arg envName "${FOOTMAN_SESSION_NAME:-}" '{
+  type: "session_start",
+  sessionId: .session_id,
+  cwd: .cwd,
+  name: (
+    (.agent_name // .agentName // .agent // .subagent_type // .subagentType
+      // .session_name // .sessionName // .name // empty)
+    // (if $envName == "" then null else $envName end)
+  )
+}' |
   curl -s --max-time 2 -X POST "$NOTIFY_URL" -H 'Content-Type: application/json' -d @- >/dev/null 2>&1
 
 exit 0

@@ -24,25 +24,58 @@ const FOOTMAN_BASE = process.env.FOOTMAN_URL || 'http://localhost:6112';
 const RESPONSE_TIMEOUT_MS = Number(process.env.FOOTMAN_PERMISSION_TIMEOUT_MS) || 55_000;
 const POLL_INTERVAL_MS = 400;
 
-// Build the permission message from a PermissionRequest payload. The payload
-// carries no prose prompt or option list — only tool_name + tool_input — so we
-// show those literally and in full: the tool name, then the exact request
-// (the command / file path / URL, or the whole tool_input as JSON otherwise).
-export function buildMessage(payload = {}) {
+// Pull the request out of a PermissionRequest payload. The payload carries no
+// prose prompt or option list — only tool_name + tool_input — so we show those
+// literally and in full: the tool name, then the exact request. `kind` names
+// what the detail actually is, because a shell command, a file path, a URL and
+// a JSON blob want different treatment in the balloon and only this side knows
+// which field it read.
+export function buildDetail(payload = {}) {
   const tool = payload.tool_name || 'Unknown tool';
   const input = payload.tool_input || {};
 
-  const primary = input.command ?? input.file_path ?? input.url ?? input.prompt;
-  let detail;
-  if (primary !== undefined && primary !== null) {
-    detail = String(primary);
-  } else if (Object.keys(input).length > 0) {
-    detail = JSON.stringify(input, null, 2);
-  } else {
-    detail = '';
+  const fields = [
+    ['command', 'command'],
+    ['file_path', 'path'],
+    ['url', 'url'],
+    ['prompt', 'text'],
+  ];
+  for (const [field, kind] of fields) {
+    const value = input[field];
+    if (value !== undefined && value !== null) return { tool, detail: String(value), kind };
   }
 
-  return detail.length > 0 ? `${tool}\n${detail}` : tool;
+  if (Object.keys(input).length > 0) {
+    return { tool, detail: JSON.stringify(input, null, 2), kind: 'json' };
+  }
+  return { tool, detail: '', kind: null };
+}
+
+// The packed "tool\ndetail" string the widget renders. The detail kind travels
+// beside it rather than inside it, so a widget that predates detailKind still
+// gets a message it can show.
+export function packMessage({ tool, detail } = {}) {
+  return detail && detail.length > 0 ? `${tool}\n${detail}` : tool;
+}
+
+// The name to show beside the project, when there is one. Claude Code's hook
+// payloads are not documented to carry a name today, so a short list of
+// plausible keys is checked and the first string found wins; if none is present
+// the name set for the session is used. Nothing is invented — with neither, the
+// widget shows the project alone, exactly as before.
+const NAME_KEYS = [
+  'agent_name', 'agentName', 'agent',
+  'subagent_type', 'subagentType',
+  'session_name', 'sessionName', 'name',
+];
+
+export function nameFrom(payload = {}, env = process.env) {
+  for (const key of NAME_KEYS) {
+    const value = payload[key];
+    if (typeof value === 'string' && value.trim() !== '') return value.trim();
+  }
+  const fromEnv = env.FOOTMAN_SESSION_NAME;
+  return typeof fromEnv === 'string' && fromEnv.trim() !== '' ? fromEnv.trim() : null;
 }
 
 // A PermissionRequest decision object wrapping the given decision body.
@@ -92,7 +125,7 @@ function readStdin() {
 
 // Show the prompt and its option buttons in the widget. Reuses the existing
 // prompt flow, so the renderer needs no changes.
-async function sendPrompt(promptId, message, labels, sessionId, cwd) {
+async function sendPrompt(promptId, message, detailKind, labels, sessionId, cwd, name) {
   const res = await fetch(`${FOOTMAN_BASE}/notify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -102,10 +135,14 @@ async function sendPrompt(promptId, message, labels, sessionId, cwd) {
       // preview) from a plain question asked via the footman_prompt MCP tool.
       kind: 'permission',
       message,
+      // What the detail is — command / path / url / text / json — so the widget
+      // can render it as what it is instead of framing everything as code.
+      detailKind,
       options: labels,
       promptId,
       sessionId,
       cwd,
+      name,
     }),
   });
   return res.ok;
@@ -150,9 +187,11 @@ async function main() {
   const promptId = randomUUID();
   const options = buildOptions(payload);
 
+  const request = buildDetail(payload);
+
   let sent = false;
   try {
-    sent = await sendPrompt(promptId, buildMessage(payload), options.map((o) => o.label), payload.session_id, payload.cwd);
+    sent = await sendPrompt(promptId, packMessage(request), request.kind, options.map((o) => o.label), payload.session_id, payload.cwd, nameFrom(payload));
   } catch {
     sent = false;
   }

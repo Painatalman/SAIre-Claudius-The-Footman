@@ -11,13 +11,29 @@ import { randomUUID } from 'node:crypto';
 const FOOTMAN_BASE = 'http://localhost:6112';
 const FOOTMAN_URL = `${FOOTMAN_BASE}/notify`;
 
+// The notification body sent to the widget. These calls carry no session id —
+// the widget's session bookkeeping comes from the hooks — so the message names
+// itself instead: the working directory tells the widget which project this is,
+// and `agent` names whoever is calling, so a named subagent is labelled
+// "project · agent" rather than appearing out of nowhere.
+export function buildNotifyBody(type, message, { options = null, promptId = null, agent = null, cwd } = {}) {
+  return {
+    type,
+    message,
+    options,
+    promptId,
+    cwd: cwd ?? process.cwd(),
+    name: typeof agent === 'string' && agent.trim() !== '' ? agent.trim() : null,
+  };
+}
+
 // Send notification to Footman widget
-async function notifyFootman(type, message, options = null, promptId = null) {
+async function notifyFootman(type, message, opts = {}) {
   try {
     const response = await fetch(FOOTMAN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, message, options, promptId })
+      body: JSON.stringify(buildNotifyBody(type, message, opts))
     });
 
     if (!response.ok) {
@@ -79,6 +95,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'The completion message to display',
             },
+            agent: {
+              type: 'string',
+              description: 'Optional: your name, if you are a named agent — shown beside the project',
+            },
           },
           required: ['message'],
         },
@@ -93,6 +113,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'The work description to display',
             },
+            agent: {
+              type: 'string',
+              description: 'Optional: your name, if you are a named agent — shown beside the project',
+            },
           },
           required: ['message'],
         },
@@ -106,6 +130,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             message: {
               type: 'string',
               description: 'The error message to display',
+            },
+            agent: {
+              type: 'string',
+              description: 'Optional: your name, if you are a named agent — shown beside the project',
             },
           },
           required: ['message'],
@@ -126,6 +154,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               items: { type: 'string' },
               description: 'Array of answer options',
             },
+            agent: {
+              type: 'string',
+              description: 'Optional: your name, if you are a named agent — shown beside the project',
+            },
           },
           required: ['question', 'options'],
         },
@@ -140,7 +172,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   switch (name) {
     case 'footman_notify_complete':
-      await notifyFootman('task_complete', args.message);
+      await notifyFootman('task_complete', args.message, { agent: args.agent });
       return {
         content: [
           {
@@ -151,7 +183,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
 
     case 'footman_notify_working':
-      await notifyFootman('task_working', args.message);
+      await notifyFootman('task_working', args.message, { agent: args.agent });
       return {
         content: [
           {
@@ -162,7 +194,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
 
     case 'footman_notify_error':
-      await notifyFootman('error', args.message);
+      await notifyFootman('error', args.message, { agent: args.agent });
       return {
         content: [
           {
@@ -174,7 +206,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     case 'footman_prompt': {
       const promptId = randomUUID();
-      const sent = await notifyFootman('prompt', args.question, args.options, promptId);
+      const sent = await notifyFootman('prompt', args.question, { options: args.options, promptId, agent: args.agent });
 
       if (!sent) {
         return {
@@ -214,7 +246,11 @@ async function main() {
   console.error('Footman MCP server running on stdio');
 }
 
-main().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+// Only start the stdio transport when run directly — importing this file for
+// tests must not open a connection, the same guard the hook scripts use.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+}

@@ -24,23 +24,58 @@ const RESPONSE_TIMEOUT_MS = Number(process.env.FOOTMAN_QUESTION_TIMEOUT_MS) || 2
 const POLL_INTERVAL_MS = 400;
 
 // Whether to leave this call to Claude Code's native UI rather than the widget.
-// v1 handles single-select questions that carry options; multi-select and
-// option-less questions defer (the widget's buttons return one label each).
+// Single- and multi-select questions are both rendered here (buttons and
+// checkboxes respectively); only a question with no options to show defers,
+// since there would be nothing to click.
 export function shouldDefer(payload = {}) {
   if (payload.tool_name !== 'AskUserQuestion') return true;
   const questions = payload.tool_input && payload.tool_input.questions;
   if (!Array.isArray(questions) || questions.length === 0) return true;
-  if (questions.some((q) => !q || q.multiSelect)) return true;
+  if (questions.some((q) => !q)) return true;
   if (questions.some((q) => !Array.isArray(q.options) || q.options.length === 0)) return true;
   return false;
 }
 
+// A usable answer: one non-empty label for a single-select question, or at
+// least one for a multi-select. Anything else — a timeout, an empty tick list —
+// defers to the native picker rather than answering on the user's behalf.
+export function isAnswered(answer, multiSelect) {
+  const filled = (value) => typeof value === 'string' && value.trim() !== '';
+  if (multiSelect) return Array.isArray(answer) && answer.length > 0 && answer.every(filled);
+  return filled(answer);
+}
+
+// The name to show beside the project, when there is one. Claude Code's hook
+// payloads are not documented to carry a name today, so a short list of
+// plausible keys is checked and the first string found wins; if none is present
+// the name set for the session is used. Nothing is invented — with neither, the
+// widget shows the project alone, exactly as before.
+const NAME_KEYS = [
+  'agent_name', 'agentName', 'agent',
+  'subagent_type', 'subagentType',
+  'session_name', 'sessionName', 'name',
+];
+
+export function nameFrom(payload = {}, env = process.env) {
+  for (const key of NAME_KEYS) {
+    const value = payload[key];
+    if (typeof value === 'string' && value.trim() !== '') return value.trim();
+  }
+  const fromEnv = env.FOOTMAN_SESSION_NAME;
+  return typeof fromEnv === 'string' && fromEnv.trim() !== '' ? fromEnv.trim() : null;
+}
+
 // The PreToolUse decision that answers the tool: the original input with an
-// `answers` map (question text -> chosen option label) merged in.
+// `answers` map (question text -> chosen option label) merged in. A
+// multi-select pick arrives as an array and is comma-joined, matching what
+// Claude Code's own picker produces for those questions.
 export function buildDecision(input, picks) {
   const questions = input.questions || [];
   const answers = {};
-  questions.forEach((q, i) => { answers[q.question] = picks[i]; });
+  questions.forEach((q, i) => {
+    const pick = picks[i];
+    answers[q.question] = Array.isArray(pick) ? pick.join(', ') : pick;
+  });
   return {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
@@ -52,11 +87,13 @@ export function buildDecision(input, picks) {
 
 // Show one question and its option buttons in the widget. Reuses the plain
 // prompt flow (no `kind`), so it renders as a question, not a permission.
-async function sendQuestion(promptId, question, labels, sessionId, cwd) {
+async function sendQuestion(promptId, question, labels, multiSelect, sessionId, cwd, name) {
   const res = await fetch(`${FOOTMAN_BASE}/notify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'prompt', message: question, options: labels, promptId, sessionId, cwd }),
+    // multiSelect turns the option buttons into checkboxes with a Confirm
+    // button, and the answer comes back as an array instead of a string.
+    body: JSON.stringify({ type: 'prompt', message: question, options: labels, multiSelect, promptId, sessionId, cwd, name }),
   });
   return res.ok;
 }
@@ -110,17 +147,16 @@ async function main() {
 
     let sent = false;
     try {
-      sent = await sendQuestion(promptId, q.question, labels, payload.session_id, payload.cwd);
+      sent = await sendQuestion(promptId, q.question, labels, Boolean(q.multiSelect), payload.session_id, payload.cwd, nameFrom(payload));
     } catch {
       sent = false;
     }
     if (!sent) process.exit(0); // Widget down — defer the whole call.
 
-    const choice = await waitForChoice(promptId, deadline);
     // A preset label, or free text the user typed via "Other" — both are valid
-    // answers. Only a missing/empty answer (e.g. a timeout) defers to the
-    // native picker.
-    if (typeof choice !== 'string' || choice.trim() === '') process.exit(0);
+    // answers, singly or as a list.
+    const choice = await waitForChoice(promptId, deadline);
+    if (!isAnswered(choice, q.multiSelect)) process.exit(0);
     picks.push(choice);
   }
 

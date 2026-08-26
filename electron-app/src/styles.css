@@ -1,3 +1,9 @@
+:root {
+  /* Set by the renderer from the avatar scale (1×–3×); the main process resizes
+     the window to match. */
+  --avatar-size: 64px;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -19,7 +25,9 @@ body {
 
 #widget-container {
   position: relative;
-  width: 380px;
+  /* Fill whatever width the window has — the main process sizes it for the
+     current avatar scale. */
+  width: 100%;
   /* Fill the window. The window itself is resized to fit the balloon
      (anchored at the bottom), so tall messages are never clipped. */
   height: 100%;
@@ -41,8 +49,8 @@ body {
 }
 
 #footman-portrait {
-  width: 64px;
-  height: 64px;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
   flex-shrink: 0;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
@@ -82,7 +90,9 @@ body {
 #footman-portrait img {
   width: 100%;
   height: 100%;
-  /* Crop the black side bars of the source image */
+  /* Fill the frame for every skin: the Footman's source is a wide screenshot
+     with black side bars, the WC2 sprites are small and squarish. Cropping a
+     little off the sides beats letterboxing one skin smaller than the rest. */
   object-fit: cover;
   border-radius: 4px;
   display: block;
@@ -222,8 +232,17 @@ body {
 }
 
 /* Session label beside working/prompt lines */
+/* A project (or "project · name") named inline in a status line. Kept on one
+   line for the same reason as the tag: half a name reads as a different one. */
+.project-name {
+  white-space: nowrap;
+}
+
 .session-tag {
   margin-left: 6px;
+  /* Never split a project name across lines — half a name reads as a different
+     project, which is exactly the confusion the tag exists to prevent. */
+  white-space: nowrap;
   font-size: 9px;
   letter-spacing: 0.5px;
   color: #8b6f47;
@@ -428,4 +447,138 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ---- Permission request anatomy -------------------------------------------
+   A request is a tool asking to do something to something. The tool gets an
+   identity line tinted by what it can do; the target is rendered as whatever it
+   actually is, rather than every request landing in the same code frame. */
+
+.tool-head {
+  font-weight: bold;
+}
+
+.tool-glyph {
+  margin-right: 5px;
+  /* A notch larger than the label: at body size the denser glyphs collapse into
+     an unreadable smudge. Some code points also get substituted with a colour
+     emoji that ignores `color`; the layout holds either way. */
+  font-size: 13px;
+  line-height: 1;
+  font-weight: normal;
+}
+
+/* The server behind an MCP tool — the thing you're really granting access to */
+.tool-server {
+  font-weight: bold;
+}
+
+.tool-exec { color: #8a3d18; }   /* can change the machine */
+.tool-read { color: #5c4a2e; }   /* mostly observes it */
+.tool-web { color: #3f5d52; }
+.tool-mcp { color: #6b3f7a; }
+.tool-other { color: #5c4a2e; }
+
+.balloon-detail {
+  margin-top: 5px;
+}
+
+/* A path or URL is not code, so it gets no frame — just emphasis on the part
+   worth checking before you allow the request. */
+.balloon-path,
+.balloon-url {
+  font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: normal;
+  word-break: break-all;
+}
+
+.path-dir,
+.url-scheme,
+.url-rest {
+  color: #9a856b;
+}
+
+.path-base,
+.url-host {
+  color: #3d2817;
+  font-weight: bold;
+}
+
+.balloon-prose {
+  font-weight: normal;
+}
+
+/* Shell commands read as commands */
+.balloon-code-command code::before {
+  content: '$ ';
+  color: #6a9955;
+}
+
+/* JSON payloads, lightly coloured so keys separate from values */
+.json-key { color: #9cdcfe; }
+.json-string { color: #ce9178; }
+.json-number { color: #b5cea8; }
+.json-literal { color: #569cd6; }
+
+/* Copy, and the fold-out for a detail too long to show whole */
+.detail-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 3px;
+}
+
+.detail-action {
+  padding: 1px 0;
+  font-family: inherit;
+  font-size: 10px;
+  color: #6b5535;
+  background: none;
+  border: none;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.detail-action:hover {
+  color: #3d2817;
+  text-decoration: underline;
+}
+
+.detail-action-done,
+.detail-action-done:hover {
+  color: #2e5d2e;
+  text-decoration: none;
+}
+
+/* ---- Multi-select questions ---------------------------------------------- */
+
+.balloon-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: normal;
+  color: #3d2817;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.balloon-check input {
+  margin: 0;
+  accent-color: #8b6f47;
+  cursor: pointer;
+}
+
+.balloon-confirm {
+  margin-top: 4px;
+  font-weight: bold;
+}
+
+.balloon-confirm:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.balloon-confirm:disabled:hover {
+  background: #e8d4b8;
 }

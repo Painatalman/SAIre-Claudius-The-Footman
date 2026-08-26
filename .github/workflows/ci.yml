@@ -42,6 +42,9 @@ jobs:
       - name: Syntax check
         working-directory: mcp-server
         run: node --check index.js
+      - name: Run unit tests
+        working-directory: mcp-server
+        run: node --test
 
   electron-app:
     name: electron-app · install + syntax
@@ -63,3 +66,6 @@ jobs:
             echo "checking $f"
             node --check "$f"
           done
+      - name: Run unit tests
+        working-directory: electron-app
+        run: node --test

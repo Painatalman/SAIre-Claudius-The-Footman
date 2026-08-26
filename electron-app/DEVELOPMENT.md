@@ -45,6 +45,17 @@ npm run dev
 - `alert`: Attention pulse for prompts
 - `shake`: Error indication
 
+## Tests
+
+`npm test` in `electron-app/`, `scripts/` and `mcp-server/` — all `node --test`, no
+display or Electron needed, all three run in CI.
+
+- `skins.test.mjs` / `message-format.test.mjs` — the pure data and formatting helpers.
+- `renderer.test.mjs` — the real `renderer.js` loaded into jsdom by `renderer-harness.mjs`,
+  covering what the balloon actually shows and what a click sends back.
+- `main.test.mjs` — the real `main.js` with Electron stubbed in the require cache, so the
+  tray menu handlers are exercised rather than merely parsed.
+
 ## Testing Without MCP Server
 
 In dev mode (`npm run dev`), mock notifications cycle through all states:
@@ -56,12 +67,13 @@ In dev mode (`npm run dev`), mock notifications cycle through all states:
 
 ## Adding Real Voice Lines
 
-1. Get MP3 files (from WC2 or recorded)
-2. Place in `../assets/sounds/`:
-   - `work-complete.mp3`
-   - `yes-my-lord.mp3`
-   - `error.mp3`
-3. Restart widget
+Voice lines belong to a skin, not to the widget:
+
+1. Drop the audio in `../assets/skins/<skin>/` (MP3 or WAV).
+2. Add each file to that skin's line pools in `src/skins.js` — `working` and `error` are
+   sound-only, `ack`, `complete` and `prompt` also carry the balloon text.
+3. `npm test` verifies every file you named exists.
+4. Restart the widget, or switch skins from the menu-bar icon.
 
 ## Customizing the Portrait
 

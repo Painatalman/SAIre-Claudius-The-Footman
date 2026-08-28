@@ -851,7 +851,6 @@ function refreshWorking() {
       sessionId: colourId,
       workingSessions: ids,
     });
-    playLine('working');
   }
 }
 
@@ -922,6 +921,7 @@ function startMockNotifications() {
         break;
       case 1:
         touchSession('mock-session', 'working');
+        playLine('working');
         refreshWorking();
         break;
       case 2:
@@ -1007,10 +1007,18 @@ ipcRenderer.on('notification', (event, data) => {
       notifyWorkComplete(message, sessionId, { cwd, name });
       refreshWorking();
       break;
-    case 'task_working':
+    case 'task_working': {
+      // The line belongs to the session that just became busy, not to the
+      // balloon being built. One balloon covers every working session, so
+      // announcing on its creation meant only the first session was ever heard
+      // — and answering a prompt spoke twice, once for the acknowledgement and
+      // again for the balloon that followed it.
+      const resumed = sessions.get(sessionId)?.state !== 'working';
       touchSession(sessionId, 'working');
+      if (sessionId && resumed) playLine('working');
       refreshWorking();
       break;
+    }
     case 'prompt':
       touchSession(sessionId, 'awaiting');
       notifyPrompt(message, { options, promptId, sessionId, kind, detailKind, multiSelect, cwd, name });

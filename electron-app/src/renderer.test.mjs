@@ -290,6 +290,56 @@ test('a custom answer on a single-select question submits it directly', () => {
   r.close();
 });
 
+// ---- Voice ------------------------------------------------------------------
+// The line announcing work used to be tied to the working balloon being built,
+// so only the first session to get busy was ever heard: anyone joining while
+// that balloon was up started silently.
+
+test('every session that starts working is heard, not just the first', () => {
+  const r = withSession();
+  r.notify({ type: 'session_start', sessionId: 's2', cwd: '/Users/me/code/other-app' });
+
+  r.notify({ type: 'task_working', sessionId: 's1' });
+  r.notify({ type: 'task_working', sessionId: 's2' });
+
+  assert.equal(r.played.length, 2);
+  r.close();
+});
+
+test('a session already working does not announce itself again', () => {
+  const r = withSession();
+  r.notify({ type: 'task_working', sessionId: 's1' });
+  r.notify({ type: 'task_working', sessionId: 's1' });
+
+  assert.equal(r.played.length, 1);
+  r.close();
+});
+
+test('a session that finished and starts again is heard again', () => {
+  const r = withSession();
+  r.notify({ type: 'task_working', sessionId: 's1' });
+  r.notify({ type: 'task_complete', sessionId: 's1' });
+  const before = r.played.length;
+
+  r.notify({ type: 'task_working', sessionId: 's1' });
+
+  assert.equal(r.played.length, before + 1);
+  r.close();
+});
+
+// Answering already speaks — the acknowledgement line — and resuming work must
+// not speak a second time on top of it.
+test('answering a prompt speaks once, not twice', () => {
+  const r = withSession();
+  r.notify({ ...permission(), message: 'Bash\nls' });
+  const before = r.played.length;
+
+  r.document.querySelector('.balloon-option').click();
+
+  assert.equal(r.played.length, before + 1);
+  r.close();
+});
+
 // ---- Skin and size ----------------------------------------------------------
 
 test('the launch arguments choose the skin and its portrait', () => {

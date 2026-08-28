@@ -70,6 +70,42 @@ const PEASANT_QUESTION = [
   { file: 'question-yes.wav', text: 'Yes?' },
 ];
 
+// The peon and goblin sapper lines are transcribed the same way. A handful of
+// the peon's are guesses at slurred orcish ("Swobu.", "Uuuuuh?") — they say what
+// the clip sounds like, which is all a transcript is here.
+const PEON_ACTION = [
+  { file: 'action-dabu.wav', text: 'Dabu!' },
+  { file: 'action-funny-tummy.wav', text: 'I got a funny tummy!' },
+  { file: 'action-lothar.wav', text: 'Lothar!' },
+  { file: 'action-swobu.wav', text: 'Swobu.' },
+  { file: 'action-tickles.wav', text: 'That tickles!' },
+  { file: 'action-you.wav', text: 'You... you...!' },
+  { file: 'action-z.wav', text: 'Zug zug!' },
+];
+
+const PEON_QUESTION = [
+  { file: 'question-attacked.wav', text: "We're under attack!" },
+  { file: 'question-lookout.wav', text: 'Look out!' },
+  { file: 'question-twobwe.wav', text: 'Trouble?' },
+  { file: 'question-ugh.wav', text: 'Ugh?' },
+  { file: 'question-uuuuuh.wav', text: 'Uuuuuh?' },
+  { file: 'question-what.wav', text: 'What?' },
+];
+
+const SAPPER_ACTION = [
+  { file: 'action-alright.wav', text: 'Alright!' },
+  { file: 'action-certainly.wav', text: 'Certainly!' },
+  { file: 'action-okay.wav', text: 'Okay!' },
+  { file: 'action-yesboss.wav', text: 'Yes, boss!' },
+];
+
+const SAPPER_QUESTION = [
+  { file: 'question-kaboom.wav', text: 'Kaboom?' },
+  { file: 'question-what.wav', text: 'What?' },
+  { file: 'question-whoisit.wav', text: 'Who is it?' },
+  { file: 'question-yes.wav', text: 'Yes?' },
+];
+
 const SKINS = {
   footman: {
     name: 'Footman',
@@ -125,6 +161,44 @@ const SKINS = {
       ],
       prompt: PEASANT_QUESTION,
       error: PEASANT_QUESTION,
+    },
+  },
+
+  peon: {
+    name: 'Peon',
+    dir: 'peon',
+    portrait: 'portrait.jpg',
+    lines: {
+      working: PEON_ACTION,
+      ack: PEON_ACTION,
+      complete: [
+        { file: 'completed-burp.wav', text: '*burp*' },
+        { file: 'completed-death.wav', text: 'Aaaargh!' },
+        { file: 'completed-missed.wav', text: 'You missed me!' },
+        { file: 'completed-ready.wav', text: 'Ready to work!' },
+        { file: 'completed-uhuhuh.wav', text: 'Uh-uh-uh!' },
+        { file: 'completed-workcomplete.wav', text: 'Work complete!' },
+      ],
+      prompt: PEON_QUESTION,
+      error: PEON_QUESTION,
+    },
+  },
+
+  'goblin-sapper': {
+    name: 'Goblin Sapper',
+    dir: 'goblin-sapper',
+    portrait: 'portrait.webp',
+    lines: {
+      working: SAPPER_ACTION,
+      ack: SAPPER_ACTION,
+      complete: [
+        { file: 'completed-beautiful.wav', text: 'Beautiful!' },
+        { file: 'completed-explosives.wav', text: 'I love explosives!' },
+        { file: 'completed-kaboom.wav', text: 'Kaboom!' },
+        { file: 'completed-ready.wav', text: 'Ready to blow!' },
+      ],
+      prompt: SAPPER_QUESTION,
+      error: SAPPER_QUESTION,
     },
   },
 };

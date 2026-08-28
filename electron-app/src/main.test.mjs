@@ -14,6 +14,10 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
+import skins from './skins.js';
+
+const { SKINS } = skins;
+
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'footman-')), 'config.json');
@@ -112,7 +116,10 @@ before(async () => {
 });
 
 test('the tray menu offers every skin and every size', () => {
-  assert.deepEqual(item('Skin').submenu.map((s) => s.label), ['Footman', 'Knight', 'Peasant']);
+  // Against the manifest rather than a literal list: the menu is built from
+  // SKINS, so adding a skin should not need this test edited.
+  const names = Object.values(SKINS).map((s) => s.name);
+  assert.deepEqual(item('Skin').submenu.map((s) => s.label), names);
   assert.deepEqual(item('Size').submenu.map((s) => s.label), ['1×', '2×', '3×']);
 });
 

@@ -260,8 +260,8 @@ curl -X POST http://localhost:6112/notify \
 
 ## Skins
 
-A skin is a portrait plus a set of voice lines. Three ship: **Footman** (default),
-**Knight** and **Peasant**.
+A skin is a portrait plus a set of voice lines. Five ship: **Footman** (default),
+**Knight**, **Peasant**, **Peon** and **Goblin Sapper**.
 
 Pick one from the menu-bar icon under `Skin ▸`, and its size under `Size ▸` (1×, 2× or
 3× — the window grows with the avatar, anchored to the corner it already sits in). Both

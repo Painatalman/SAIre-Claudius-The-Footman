@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multiple permission prompts can be pending at the same time, each with its own buttons and answered independently, instead of a new prompt wiping out the previous one's options
 - Answering a prompt now returns the Footman to the "Working…" status (and marks the session as at work again) instead of dropping to idle
 - Permission prompts that were answered in Claude Code's own dialog, or that timed out, now dismiss themselves instead of lingering — the widget tracks which prompts still have something waiting on an answer and clears the rest
+- Every session that starts working is announced out loud, not just the first one — a session that got busy while another was already working used to start silently; answering a prompt also stopped speaking a stray second line
 
 ### Changed
 

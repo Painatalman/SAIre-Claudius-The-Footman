@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Footman now varies what he says per action — e.g. "My Lord?" / "Your command?" for prompts, "As you wish!" / "At your service!" when you answer — each weighted to the more common line and paired with its matching voice line
 - The Footman runs as a macOS **menu-bar app**: a helmet icon in the top bar (no dock icon) with a menu to show/hide the widget, recentre it, or quit
 - Two more characters to pick from under `Skin ▸` — the **Peon** and the **Goblin Sapper**, each with their own portrait and Warcraft 2 voice lines for starting work, finishing, and being asked something
+- **Demo mode** — a `Demo mode` entry in the menu-bar icon (or `electron . --demo`) plays a guided tour for showing the widget to someone: a session at work, several projects at once, a question, a multiple-choice question and a permission request (each waits for your click), a completion and an error, then every skin in turn with the portrait and voice swapping live. It never saves the skin it ends on and clears up the sessions it invents
 
 ### Fixed
 

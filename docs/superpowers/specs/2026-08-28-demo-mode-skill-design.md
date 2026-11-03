@@ -1,7 +1,11 @@
 # Demo mode: a guided tour of the widget for an audience
 
 **Date:** 2026-08-28
-**Status:** Drafted, not implemented
+**Status:** Superseded 2026-11-03 — built as a tray mode inside the widget, not as a skill.
+Skin changes turned out to be wanted in the tour itself, and they can only be made from
+the widget's own process, so the demo moved there (`electron-app/src/demo.js`, the tray's
+`Demo mode`; see the README). Kept for the act list and the reasoning on prompt heartbeats,
+which carried over unchanged.
 
 ## Problem
 

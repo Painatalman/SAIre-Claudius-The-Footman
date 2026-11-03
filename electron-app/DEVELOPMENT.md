@@ -55,6 +55,8 @@ display or Electron needed, all three run in CI.
   covering what the balloon actually shows and what a click sends back.
 - `main.test.mjs` — the real `main.js` with Electron stubbed in the require cache, so the
   tray menu handlers are exercised rather than merely parsed.
+- `demo.test.mjs` — the demo tour: its script, its runner, its HTTP transport, and a full
+  play-through into the real `renderer.js` to prove every payload actually renders.
 
 ## Testing Without MCP Server
 

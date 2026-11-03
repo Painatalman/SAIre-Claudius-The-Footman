@@ -296,6 +296,35 @@ voice stays in character everywhere; the written status lines are deliberately p
 Portraits are cropped to fill a square frame (`object-fit: cover`), so every skin's avatar
 is the same size regardless of the source image's shape.
 
+## Demo mode
+
+A guided tour of the widget, for showing it to someone. Pick `Demo mode` from the menu-bar
+icon — the entry turns into `Stop demo` while it plays — or launch straight into it:
+
+```bash
+cd electron-app
+env -u ELECTRON_RUN_AS_NODE npx electron . --demo
+```
+
+It plays through the widget's own HTTP API, the way the hooks do, so the audience sees the
+real product rather than a mock-up:
+
+1. A session checks in and starts work.
+2. Two more projects join — the working line lists all three, one colour each.
+3. A question with buttons, a question with checkboxes, and a permission request with
+   `Allow` / `Always allow` / `Deny`. Each waits up to 45 seconds for a click, then moves on
+   without one, so click whenever you are ready to show what an answer does.
+4. Work completes, then something breaks.
+5. Every skin takes a turn: the portrait and voice swap live, and the character speaks a
+   working line, a completed line and a question line, so each skin is heard on all its pools.
+
+It leaves no trace. The skin it ends the parade on is never saved — `footman.config.json` is
+not written — and the skin you started with comes back when the tour ends or you press
+`Stop demo`. The Skin menu is greyed out while it plays. Every session it invents is named
+`demo-…` and ended again, so the counter empties. It never answers a question on your behalf.
+
+The tour is a plain list of steps in `electron-app/src/demo.js`; add or retime an act there.
+
 ## Troubleshooting
 
 - **No sound** — Electron blocks autoplay without a user gesture by default; the app sets `autoplay-policy: no-user-gesture-required`, so if sounds are missing, check the paths resolve (`assets/skins/` is at the repo root, two levels above `electron-app/src/`).

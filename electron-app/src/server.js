@@ -113,4 +113,4 @@ function start(onError) {
   });
 }
 
-module.exports = { start, setWindow, storeResponse };
+module.exports = { start, setWindow, storeResponse, PORT };

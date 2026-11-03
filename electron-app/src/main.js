@@ -1,7 +1,9 @@
 const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { randomUUID } = require('crypto');
 const server = require('./server');
+const demo = require('./demo');
 const { SKINS, resolveSkin, SCALES, resolveScale, windowSizeFor } = require('./skins');
 
 let tray = null;
@@ -205,17 +207,24 @@ function resetWindowPosition() {
   savePosition();
 }
 
-// Change the skin from the tray. Persisted for next launch, and applied live
-// over IPC — relaunching instead would race the new process against this one
-// releasing port 6112, and would drop the session map and any live prompt.
-function selectSkin(skinId) {
+// Switch the skin on screen, live over IPC — relaunching instead would race the
+// new process against this one releasing port 6112, and would drop the session
+// map and any live prompt. Nothing is saved: that is what lets the demo parade
+// through every skin without the last one becoming the permanent choice.
+function showSkin(skinId) {
   if (!SKINS[skinId] || skinId === activeSkin) return;
   activeSkin = skinId;
-  writeConfig({ skin: skinId });
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('skin-changed', skinId);
   }
   refreshTrayMenu(); // move the radio check to the new skin
+}
+
+// Change the skin from the tray: shown now, and persisted for the next launch.
+function selectSkin(skinId) {
+  if (!SKINS[skinId] || skinId === activeSkin) return;
+  writeConfig({ skin: skinId });
+  showSkin(skinId);
 }
 
 // Change the avatar size from the tray. The window has to grow with it, and it
@@ -239,6 +248,39 @@ function selectScale(scale) {
   refreshTrayMenu();
 }
 
+// The AbortController of the demo that is playing, or null. Doubles as the
+// "is a demo running" flag the tray menu reads.
+let demoRun = null;
+
+// Start the demo, or stop the one that is playing. The tour talks to the widget
+// over its own HTTP API, like the hooks do, and borrows the skin switch above.
+function toggleDemo() {
+  if (demoRun) {
+    demoRun.abort();
+    return;
+  }
+
+  const controller = new AbortController();
+  demoRun = controller;
+  refreshTrayMenu(); // "Stop demo", and the Skin menu locks
+
+  demo
+    .runDemo(demo.buildScript(Object.keys(SKINS)), {
+      ...demo.createTransport(`http://localhost:${server.PORT}`),
+      getSkin: () => activeSkin,
+      setSkin: showSkin,
+      sleep: demo.sleep,
+      newId: randomUUID,
+      signal: controller.signal,
+      log: (act) => console.log(`Demo: ${act}`),
+    })
+    .catch((err) => console.error('Demo stopped:', err))
+    .finally(() => {
+      demoRun = null;
+      refreshTrayMenu();
+    });
+}
+
 function buildTrayMenu() {
   // FOOTMAN_SKIN wins at every startup, so a pick made here wouldn't survive a
   // relaunch. Disable the submenu rather than silently losing the click.
@@ -255,7 +297,9 @@ function buildTrayMenu() {
         label: skin.name,
         type: 'radio',
         checked: id === activeSkin,
-        enabled: !overridden,
+        // A pick during the demo would be saved, then undone by the demo's own
+        // restore — leaving the file and the screen disagreeing.
+        enabled: !overridden && !demoRun,
         click: () => selectSkin(id),
       })),
     },
@@ -270,6 +314,8 @@ function buildTrayMenu() {
       })),
     },
     { type: 'separator' },
+    { label: demoRun ? 'Stop demo' : 'Demo mode', click: toggleDemo },
+    { type: 'separator' },
     { label: 'Reset position', click: resetWindowPosition },
     { type: 'separator' },
     { label: 'Quit Avatar', click: () => app.quit() },
@@ -281,7 +327,8 @@ function refreshTrayMenu() {
 }
 
 // macOS menu-bar (tray) icon — the avatar lives in the top bar instead of the
-// dock, with a small menu to show/hide it, switch skins, recentre it, or quit.
+// dock, with a small menu to show/hide it, switch its skin or size, play the
+// demo, recentre it, or quit.
 // The menu names the widget rather than the character, since the skin changes.
 function createTray() {
   const iconPath = path.join(__dirname, '..', '..', 'assets', 'sprites', 'helmetTemplate.png');
@@ -303,6 +350,13 @@ app.whenReady().then(() => {
   server.start(() => app.quit());
   startClickThroughPolling();
   createTray();
+
+  // `electron . --demo` starts the tour on launch, for running it from a
+  // terminal. Wait for the renderer: a notification sent before it has loaded
+  // is simply lost.
+  if (process.argv.includes('--demo')) {
+    mainWindow.webContents.once('did-finish-load', toggleDemo);
+  }
 });
 
 app.on('window-all-closed', () => {

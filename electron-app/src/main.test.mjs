@@ -1,6 +1,6 @@
 // Wiring tests for the main process. main.js can't be imported normally — it
-// talks to Electron at load — so Electron and the notification server are
-// stubbed in the require cache and the real file is loaded on top of them.
+// talks to Electron at load — so Electron, the notification server and the demo
+// runner are stubbed in the require cache and the real file is loaded on top of them.
 //
 // These exist because a tray handler once called a function that had been
 // renamed out from under it. `node --check` reports that file as valid: it is
@@ -28,12 +28,17 @@ const recorded = {
   sent: [],            // messages pushed to the renderer
   bounds: { x: 100, y: 500, width: 380, height: 180 },
   windowArgs: null,
+  onceLoaded: null,    // the did-finish-load callback main.js registered, if any
 };
 
 const noop = () => {};
 
+// One turn of the event loop: enough for a resolved promise's handlers to run.
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
 const webContents = {
   send: (channel, payload) => recorded.sent.push({ channel, payload }),
+  once: (event, callback) => { if (event === 'did-finish-load') recorded.onceLoaded = callback; },
   openDevTools: noop,
 };
 
@@ -79,6 +84,25 @@ const electronStub = {
   nativeImage: { createFromPath: () => ({ setTemplateImage: noop }) },
 };
 
+// The demo itself is tested in demo.test.mjs. Here main.js is the subject — how
+// it starts, stops and lends the demo the widget's skin — so the runner is a
+// stand-in that hands back what main gave it and ends when a test says so.
+const demoCalls = { skinIds: null, base: null, steps: null, io: null, finish: null, fail: null };
+
+const demoStub = {
+  buildScript: (skinIds) => { demoCalls.skinIds = skinIds; return ['the', 'script']; },
+  createTransport: (base) => {
+    demoCalls.base = base;
+    return { notify: async () => {}, poll: async () => undefined };
+  },
+  sleep: async () => {},
+  runDemo: (steps, io) => {
+    demoCalls.steps = steps;
+    demoCalls.io = io;
+    return new Promise((resolve, reject) => { demoCalls.finish = resolve; demoCalls.fail = reject; });
+  },
+};
+
 // Find a menu item by label prefix, at the top level or inside a submenu.
 function item(label) {
   const top = recorded.menu.find((entry) => (entry.label || '').startsWith(label));
@@ -108,11 +132,15 @@ before(async () => {
   require.cache[require.resolve('electron')] = { id: 'electron', filename: 'electron', loaded: true, exports: electronStub };
   require.cache[require.resolve('./server.js')] = {
     id: 'server', filename: 'server', loaded: true,
-    exports: { start: noop, setWindow: noop, storeResponse: noop },
+    exports: { start: noop, setWindow: noop, storeResponse: noop, PORT: 6112 },
   };
+  require.cache[require.resolve('./demo.js')] = { id: 'demo', filename: 'demo', loaded: true, exports: demoStub };
 
+  // Launched as `electron . --demo`, so main.js has to arrange for the demo to start.
+  process.argv.push('--demo');
   require(path.join(HERE, 'main.js'));
-  await new Promise((resolve) => setImmediate(resolve)); // let whenReady() run
+  await settle(); // let whenReady() run
+  process.argv.pop();
 });
 
 test('the tray menu offers every skin and every size', () => {
@@ -165,4 +193,87 @@ test('the menu check marks follow the active skin and size', () => {
   assert.equal(submenuItem('Skin', 'Footman').checked, false);
   assert.equal(submenuItem('Size', '3×').checked, true);
   assert.equal(submenuItem('Size', '1×').checked, false);
+});
+
+// ---- Demo mode ------------------------------------------------------------------
+
+test('the tray offers Demo mode, and the Skin menu is usable while it is idle', () => {
+  assert.equal(item('Demo mode').label, 'Demo mode');
+  assert.ok(item('Skin').submenu.every((entry) => entry.enabled));
+});
+
+test('clicking Demo mode plays the tour over the server\'s own port, through every skin', () => {
+  item('Demo mode').click();
+
+  assert.deepEqual(demoCalls.skinIds, Object.keys(SKINS));
+  assert.equal(demoCalls.base, 'http://localhost:6112');
+  assert.deepEqual(demoCalls.steps, ['the', 'script']);
+  assert.equal(item('Stop demo').label, 'Stop demo', 'the same entry now stops it');
+});
+
+test('while the demo plays, the Skin menu is locked so a pick cannot be saved over its own restore', () => {
+  assert.ok(item('Skin').submenu.every((entry) => entry.enabled === false));
+});
+
+test('the demo can change the skin live without saving it', () => {
+  const saved = fs.readFileSync(CONFIG, 'utf8');
+  const { io } = demoCalls;
+  assert.equal(io.getSkin(), 'knight');
+
+  recorded.sent.length = 0;
+  io.setSkin('peasant');
+
+  assert.deepEqual(recorded.sent, [{ channel: 'skin-changed', payload: 'peasant' }]);
+  assert.equal(io.getSkin(), 'peasant');
+  assert.equal(submenuItem('Skin', 'Peasant').checked, true, 'the menu check follows the parade');
+  assert.equal(fs.readFileSync(CONFIG, 'utf8'), saved, 'the demo must not rewrite footman.config.json');
+
+  io.setSkin('knight'); // what the runner does when the tour ends
+  assert.equal(fs.readFileSync(CONFIG, 'utf8'), saved);
+});
+
+test('Stop demo aborts the run the demo was given', () => {
+  const { signal } = demoCalls.io;
+  assert.equal(signal.aborted, false);
+
+  item('Stop demo').click();
+
+  assert.equal(signal.aborted, true);
+});
+
+test('once the demo has ended the menu goes back to Demo mode and the Skin menu unlocks', async () => {
+  demoCalls.finish();
+  await settle();
+
+  assert.equal(item('Demo mode').label, 'Demo mode');
+  assert.ok(item('Skin').submenu.every((entry) => entry.enabled));
+});
+
+test('a demo that fails is reported, and the menu still recovers', async () => {
+  const errors = [];
+  const realError = console.error;
+  console.error = (...args) => errors.push(args.join(' '));
+  try {
+    item('Demo mode').click();
+    demoCalls.fail(new Error('Widget refused task_working: HTTP 500'));
+    await settle();
+  } finally {
+    console.error = realError;
+  }
+
+  assert.match(errors.join('\n'), /Widget refused task_working/);
+  assert.equal(item('Demo mode').label, 'Demo mode');
+  assert.ok(item('Skin').submenu.every((entry) => entry.enabled));
+});
+
+test('launching with --demo starts the tour once the window has loaded', async () => {
+  assert.equal(typeof recorded.onceLoaded, 'function', 'main.js should wait for the window to load');
+  assert.equal(item('Demo mode').label, 'Demo mode', 'not before it has loaded');
+
+  recorded.onceLoaded();
+  assert.equal(item('Stop demo').label, 'Stop demo');
+
+  item('Stop demo').click();
+  demoCalls.finish();
+  await settle();
 });
